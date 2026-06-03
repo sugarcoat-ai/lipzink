@@ -6,7 +6,7 @@ import {
   type LipsyncStatus,
   type ShapeCue,
   useLipsync,
-} from "@avatalk/mouth"
+} from "@lipzink/mouth"
 
 import { TalkingAvatar } from "./talking-avatar"
 import type { AvatarConfig } from "./avatar-model"
@@ -62,7 +62,7 @@ type AvatarProps = {
 /**
  * The avatar as a drop-in React component: pass a `spec` to render it, and use
  * the `ref` voice handle to feed it audio. The lip-sync mouth is driven
- * internally (via `@avatalk/mouth`) — you don't wire up shapes or analysers.
+ * internally (via `@lipzink/mouth`) — you don't wire up shapes or analysers.
  */
 export function Avatar({
   spec,

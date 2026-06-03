@@ -2,13 +2,13 @@
 
 import { useSyncExternalStore } from "react"
 
-import { type AvatarConfig, DEFAULT_AVATAR } from "@avatalk/avatar"
+import { type AvatarConfig, DEFAULT_AVATAR } from "@lipzink/avatar"
 
 // localStorage-backed avatar store, exposed through useSyncExternalStore so the
 // persisted avatar is read consistently (no setState-in-effect, no hydration
 // mismatch) and shared across the maker and talk pages.
 
-const KEY = "avatalk:avatar"
+const KEY = "lipzink:avatar"
 const listeners = new Set<() => void>()
 
 let cache: AvatarConfig = DEFAULT_AVATAR

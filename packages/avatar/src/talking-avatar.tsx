@@ -1,4 +1,4 @@
-import { Mouth, type LipShape } from "@avatalk/mouth"
+import { Mouth, type LipShape } from "@lipzink/mouth"
 
 import { AvatarCanvas } from "./avatar-canvas"
 import { type AvatarConfig, MOUTH_CENTER } from "./avatar-model"

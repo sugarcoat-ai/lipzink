@@ -87,7 +87,7 @@ export function AvatarCanvas({
               draggable={false}
               className={cn(
                 "pointer-events-none absolute inset-0 h-full w-full select-none",
-                blink && category === "eyes" && "avatalk-eyes-blink",
+                blink && category === "eyes" && "lipzink-eyes-blink",
               )}
             />
           );

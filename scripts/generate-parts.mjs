@@ -1,5 +1,5 @@
 // Inlines the notion-avatar SVG parts into a TypeScript module as data URLs, so
-// `@avatalk/avatar` bundles its own art and works on install with zero asset
+// `@lipzink/avatar` bundles its own art and works on install with zero asset
 // setup — no /public copy, no partsBaseUrl. The SVGs in src/parts are the
 // source of truth; this regenerates src/parts.generated.ts from them.
 //

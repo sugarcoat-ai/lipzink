@@ -12,7 +12,7 @@ import {
   cyclePart,
   partFrame,
   partSrc,
-} from "@avatalk/avatar"
+} from "@lipzink/avatar"
 import { setAvatarConfig } from "@/lib/use-avatar"
 import { cn } from "@/lib/utils"
 

@@ -1,5 +1,5 @@
 {
-  "name": "avatalk-monorepo",
+  "name": "lipzink-monorepo",
   "version": "0.0.1",
   "type": "module",
   "private": true,
@@ -8,11 +8,11 @@
     "apps/*"
   ],
   "scripts": {
-    "dev": "bun --filter avatalk-demo dev",
+    "dev": "bun --filter lipzink-demo dev",
     "build": "bun --filter './packages/*' build",
-    "build:demo": "bun --filter avatalk-demo build",
+    "build:demo": "bun --filter lipzink-demo build",
     "typecheck": "bun --filter '*' typecheck",
-    "lint": "bun --filter avatalk-demo lint",
+    "lint": "bun --filter lipzink-demo lint",
     "format": "prettier --write \"**/*.{ts,tsx}\"",
     "generate:parts": "node scripts/generate-parts.mjs",
     "fetch:parts": "node scripts/fetch-parts.mjs"

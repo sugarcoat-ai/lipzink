@@ -4,7 +4,7 @@
 // JSON verbatim (base64 MP3 + character-level alignment). The browser turns the
 // alignment into a scheduled cue timeline so the avatar's mouth lands on each
 // phoneme on time instead of trailing the audio. See `fetchElevenLabsSpeech`
-// in @avatalk/mouth, which consumes exactly this response.
+// in @lipzink/mouth, which consumes exactly this response.
 //
 // Requires ELEVENLABS_API_KEY in the environment (see .env.example).
 

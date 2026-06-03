@@ -1,4 +1,4 @@
-// @avatalk/mouth — a black & white CSS lip-sync mouth you can drop onto any
+// @lipzink/mouth — a black & white CSS lip-sync mouth you can drop onto any
 // illustration, driven by any audio you supply. No avatar, no assets, no TTS.
 
 export { Mouth } from "./mouth"

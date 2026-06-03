@@ -27,7 +27,7 @@ import {
   type AvatarConfig,
   type AvatarVoiceHandle,
   randomAvatar,
-} from "@avatalk/avatar"
+} from "@lipzink/avatar"
 import {
   fetchElevenLabsSpeech,
   type LipShape,
@@ -37,7 +37,7 @@ import {
   Mouth,
   TalkingMouth,
   type TalkingMouthHandle,
-} from "@avatalk/mouth"
+} from "@lipzink/mouth"
 import { PartCarousel } from "@/components/avatar/part-picker"
 import { CodeWindow } from "@/components/site/code-window"
 import { MonaLisa } from "@/components/site/mona-lisa"
@@ -62,7 +62,7 @@ const VOICES = [
   { id: "TxGEqnHWrfWFTfGW9XjX", name: "Josh" },
 ]
 
-const INSTALL_CMD = "npm i @avatalk/avatar @avatalk/mouth"
+const INSTALL_CMD = "npm i @lipzink/avatar @lipzink/mouth"
 const REPO_URL = "https://github.com/"
 
 function specText(config: AvatarConfig): string {
@@ -84,8 +84,8 @@ async function speak(
 
 // --- Code samples ---------------------------------------------------------
 
-const HERO_CODE = `import { Avatar } from "@avatalk/avatar"
-import "@avatalk/avatar/styles.css"
+const HERO_CODE = `import { Avatar } from "@lipzink/avatar"
+import "@lipzink/avatar/styles.css"
 
 // "spec" is the JSON you build & copy below
 export function Hi({ spec }) {
@@ -93,10 +93,10 @@ export function Hi({ spec }) {
 }`
 
 const ELEVEN_CODE = `import { useRef } from "react"
-import { Avatar, type AvatarVoiceHandle } from "@avatalk/avatar"
-import { fetchElevenLabsSpeech } from "@avatalk/mouth"
-import "@avatalk/avatar/styles.css"
-import "@avatalk/mouth/styles.css"
+import { Avatar, type AvatarVoiceHandle } from "@lipzink/avatar"
+import { fetchElevenLabsSpeech } from "@lipzink/mouth"
+import "@lipzink/avatar/styles.css"
+import "@lipzink/mouth/styles.css"
 
 function Talking({ spec }) {
   const voice = useRef<AvatarVoiceHandle>(null)
@@ -115,9 +115,9 @@ function Talking({ spec }) {
 }`
 
 const ANY_AUDIO_CODE = `import { useRef } from "react"
-import { Avatar, type AvatarVoiceHandle } from "@avatalk/avatar"
-import "@avatalk/avatar/styles.css"
-import "@avatalk/mouth/styles.css"
+import { Avatar, type AvatarVoiceHandle } from "@lipzink/avatar"
+import "@lipzink/avatar/styles.css"
+import "@lipzink/mouth/styles.css"
 
 function Talking({ spec }) {
   const voice = useRef<AvatarVoiceHandle>(null)
@@ -134,8 +134,8 @@ function Talking({ spec }) {
   )
 }`
 
-const MOUTH_CODE = `import { TalkingMouth } from "@avatalk/mouth"
-import "@avatalk/mouth/styles.css"
+const MOUTH_CODE = `import { TalkingMouth } from "@lipzink/mouth"
+import "@lipzink/mouth/styles.css"
 
 // Just the mouth — no avatar, no bundled art. Overlay it on your illustration:
 function MyCharacter() {
@@ -151,8 +151,8 @@ function MyCharacter() {
 }`
 
 const OWN_FACE_CODE = `import { useRef } from "react"
-import { TalkingMouth, type TalkingMouthHandle } from "@avatalk/mouth"
-import "@avatalk/mouth/styles.css"
+import { TalkingMouth, type TalkingMouthHandle } from "@lipzink/mouth"
+import "@lipzink/mouth/styles.css"
 
 function Portrait() {
   const mouth = useRef<TalkingMouthHandle>(null)
@@ -262,7 +262,7 @@ export default function Page() {
   useEffect(() => {
     if (randomized.current) return
     randomized.current = true
-    if (!window.localStorage.getItem("avatalk:avatar")) {
+    if (!window.localStorage.getItem("lipzink:avatar")) {
       setAvatarConfig(randomAvatar())
     }
   }, [])
@@ -298,7 +298,7 @@ export default function Page() {
       <header className="bg-background/80 sticky top-0 z-50 border-b backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
           <span className="font-mono text-sm font-semibold tracking-tight">
-            avatalk
+            lipzink
           </span>
           <span className="bg-muted text-muted-foreground hidden rounded-full px-2 py-0.5 font-mono text-[10px] sm:inline">
             v0.1
@@ -489,7 +489,7 @@ export default function Page() {
       {/* ---------- Case 02 · Mouth only ---------- */}
       <Section id="mouth">
         <SectionHeader kicker="Use case 02 · Mouth only" title="Just the mouth">
-          Don’t need the whole character? <code className="text-xs">@avatalk/mouth</code>{" "}
+          Don’t need the whole character? <code className="text-xs">@lipzink/mouth</code>{" "}
           is a standalone, pure-CSS mouth — no avatar, no assets. Position it over
           any illustration and tint it to match.
         </SectionHeader>
@@ -534,7 +534,12 @@ export default function Page() {
       <footer className="border-t">
         <div className="text-muted-foreground mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-10 text-sm sm:flex-row">
           <div className="flex items-center gap-2">
-            <span className="font-mono font-semibold tracking-tight">avatalk</span>
+            <a
+              href="https://lipz.ink"
+              className="font-mono font-semibold tracking-tight hover:text-foreground transition-colors"
+            >
+              lipz.ink
+            </a>
             <span className="text-muted-foreground/70">·</span>
             <span>MIT licensed</span>
           </div>

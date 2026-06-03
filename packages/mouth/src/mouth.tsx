@@ -31,7 +31,7 @@ function cx(...parts: (string | false | undefined)[]): string {
  * animates the mouth between phoneme groups via CSS transitions. It's pure
  * presentation — position it absolutely over any illustration you like.
  *
- * Styles ship in `@avatalk/mouth/styles.css` (auto-included here for bundlers
+ * Styles ship in `@lipzink/mouth/styles.css` (auto-included here for bundlers
  * that follow the side-effect import).
  */
 export function Mouth({
@@ -51,15 +51,15 @@ export function Mouth({
 
   return (
     <div
-      className={cx("avatalk-mouth", className)}
+      className={cx("lipzink-mouth", className)}
       data-letters={shape}
       style={style}
       aria-hidden
     >
-      <div className="avatalk-mouth__tongue avatalk-mouth__tongue--left" />
-      <div className="avatalk-mouth__tongue avatalk-mouth__tongue--right" />
-      <div className="avatalk-mouth__teeth avatalk-mouth__teeth--upper" />
-      <div className="avatalk-mouth__teeth avatalk-mouth__teeth--lower" />
+      <div className="lipzink-mouth__tongue lipzink-mouth__tongue--left" />
+      <div className="lipzink-mouth__tongue lipzink-mouth__tongue--right" />
+      <div className="lipzink-mouth__teeth lipzink-mouth__teeth--upper" />
+      <div className="lipzink-mouth__teeth lipzink-mouth__teeth--lower" />
     </div>
   )
 }

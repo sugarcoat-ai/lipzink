@@ -1,5 +1,5 @@
 {
-  "name": "@avatalk/avatar",
+  "name": "@lipzink/avatar",
   "version": "0.1.0",
   "description": "A notion-style avatar with a built-in, voice-agnostic lip-sync mouth. Bundles its own art — works on install with zero asset setup.",
   "license": "MIT",
@@ -37,7 +37,7 @@
     "react-dom": ">=19"
   },
   "dependencies": {
-    "@avatalk/mouth": "workspace:*"
+    "@lipzink/mouth": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^19",

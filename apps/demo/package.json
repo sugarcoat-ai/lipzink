@@ -1,5 +1,5 @@
 {
-  "name": "avatalk-demo",
+  "name": "lipzink-demo",
   "version": "0.0.1",
   "type": "module",
   "private": true,
@@ -11,8 +11,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@avatalk/avatar": "workspace:*",
-    "@avatalk/mouth": "workspace:*",
+    "@lipzink/avatar": "workspace:*",
+    "@lipzink/mouth": "workspace:*",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^1.17.0",

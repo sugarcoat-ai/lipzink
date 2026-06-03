@@ -1,5 +1,5 @@
-// @avatalk/avatar — a notion-style avatar with a built-in lip-sync mouth. Ships
-// its own art (bundled SVGs), depends on @avatalk/mouth for the talking mouth,
+// @lipzink/avatar — a notion-style avatar with a built-in lip-sync mouth. Ships
+// its own art (bundled SVGs), depends on @lipzink/mouth for the talking mouth,
 // and is voice-agnostic: feed it audio, no TTS baked in.
 
 export { Avatar } from "./avatar"

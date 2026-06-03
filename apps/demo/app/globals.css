@@ -128,7 +128,7 @@
     }
 }
 
-/* The eye-blink animation now ships with @avatalk/avatar (avatar.css), pulled
+/* The eye-blink animation now ships with @lipzink/avatar (avatar.css), pulled
    in automatically when <Avatar> renders. */
 
 @layer components {
@@ -154,7 +154,7 @@
 }
 
 /* Soft entrance for sections / the avatar stage. */
-@keyframes avatalk-rise {
+@keyframes lipzink-rise {
   from {
     opacity: 0;
     transform: translateY(8px);
@@ -165,5 +165,5 @@
   }
 }
 .animate-rise {
-  animation: avatalk-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation: lipzink-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
 }

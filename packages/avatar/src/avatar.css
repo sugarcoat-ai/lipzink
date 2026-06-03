@@ -1,7 +1,7 @@
 /* Eye blink: briefly squash the eyes layer toward the eye line every few
    seconds so the avatar feels alive. Applied to the full-canvas eyes layer;
    the eyes sit ~mid-canvas, so the origin is roughly its centre. */
-@keyframes avatalk-blink {
+@keyframes lipzink-blink {
   0%,
   93%,
   100% {
@@ -13,14 +13,14 @@
   }
 }
 
-.avatalk-eyes-blink {
+.lipzink-eyes-blink {
   transform-origin: 50% 49%;
-  animation: avatalk-blink 5.4s ease-in-out infinite;
+  animation: lipzink-blink 5.4s ease-in-out infinite;
   will-change: transform;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .avatalk-eyes-blink {
+  .lipzink-eyes-blink {
     animation: none;
   }
 }

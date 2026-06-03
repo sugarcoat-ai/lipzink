@@ -1,4 +1,4 @@
-// @avatalk/mouth — ElevenLabs driver.
+// @lipzink/mouth — ElevenLabs driver.
 //
 // The recommended way to make the mouth land *on* the words instead of trailing
 // them. ElevenLabs' `/with-timestamps` endpoints return the synthesized audio
