@@ -14,7 +14,9 @@ import { join } from "node:path";
 
 const BASE =
   "https://raw.githubusercontent.com/Mayandev/notion-avatar/main/public/avatar/preview";
-const OUT = new URL("../public/avatar", import.meta.url).pathname;
+// SVGs are the source of truth for @avatalk/avatar; after fetching, run
+// `bun run generate:parts` to re-inline them into parts.generated.ts.
+const OUT = new URL("../packages/avatar/src/parts", import.meta.url).pathname;
 
 // Max source indices to probe per category (we skip gaps / 404s).
 const CATEGORIES = {
