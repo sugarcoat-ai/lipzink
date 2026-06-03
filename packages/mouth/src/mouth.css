@@ -23,14 +23,14 @@
   inline-size: 80px;
   block-size: 40px;
   background-color: var(--ls-cavity);
-  transition: 0.18s ease;
+  transition: 0.09s ease;
 }
 
 .avatalk-mouth__tongue {
   position: absolute;
   background-color: var(--ls-tongue);
   border-radius: 51% 49% 54% 46% / 34% 39% 61% 66%;
-  transition: 0.18s ease;
+  transition: 0.09s ease;
 }
 .avatalk-mouth__tongue--left {
   inset-inline-start: 20%;
@@ -42,7 +42,7 @@
 .avatalk-mouth__teeth {
   position: absolute;
   background-color: var(--ls-teeth);
-  transition: 0.18s ease;
+  transition: 0.09s ease;
 }
 
 /* ---------- neutral / rest (lips gently closed) ---------- */

@@ -29,5 +29,18 @@ export {
   azureVisemeToShape,
   wawaVisemeToShape,
   audioToShape,
+  cuesAt,
+  alignmentToCues,
 } from "./lipsync"
-export type { LipShape } from "./lipsync"
+export type { LipShape, ShapeCue, ElevenLabsAlignment } from "./lipsync"
+
+// ElevenLabs driver — fetch `/with-timestamps` speech and turn it into a
+// scheduled cue timeline (the recommended, on-time lip-sync path).
+export {
+  parseElevenLabs,
+  fetchElevenLabsSpeech,
+} from "./elevenlabs"
+export type {
+  ElevenLabsResponse,
+  ElevenLabsSpeech,
+} from "./elevenlabs"

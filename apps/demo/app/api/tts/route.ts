@@ -1,7 +1,10 @@
 // ElevenLabs text-to-speech proxy.
 //
-// Keeps the API key server-side and streams the MP3 back to the browser, which
-// pipes it through a Web Audio analyser to drive the avatar's mouth.
+// Keeps the API key server-side and returns ElevenLabs' `/with-timestamps`
+// JSON verbatim (base64 MP3 + character-level alignment). The browser turns the
+// alignment into a scheduled cue timeline so the avatar's mouth lands on each
+// phoneme on time instead of trailing the audio. See `fetchElevenLabsSpeech`
+// in @avatalk/mouth, which consumes exactly this response.
 //
 // Requires ELEVENLABS_API_KEY in the environment (see .env.example).
 
@@ -41,12 +44,13 @@ export async function POST(request: Request) {
   const voiceId = body.voiceId || "21m00Tcm4TlvDq8ikWAM";
   const modelId = body.modelId || "eleven_multilingual_v2";
 
-  const upstream = await fetch(`${ELEVENLABS_URL}/${voiceId}`, {
+  // `/with-timestamps` returns JSON: { audio_base64, alignment, normalized_alignment }.
+  const upstream = await fetch(`${ELEVENLABS_URL}/${voiceId}/with-timestamps`, {
     method: "POST",
     headers: {
       "xi-api-key": apiKey,
       "Content-Type": "application/json",
-      accept: "audio/mpeg",
+      accept: "application/json",
     },
     body: JSON.stringify({
       text,
@@ -55,7 +59,7 @@ export async function POST(request: Request) {
     }),
   });
 
-  if (!upstream.ok || !upstream.body) {
+  if (!upstream.ok) {
     const detail = await upstream.text().catch(() => "");
     return Response.json(
       { error: `ElevenLabs request failed (${upstream.status})`, detail },
@@ -63,11 +67,7 @@ export async function POST(request: Request) {
     );
   }
 
-  // Stream the audio straight through to the client.
-  return new Response(upstream.body, {
-    headers: {
-      "Content-Type": "audio/mpeg",
-      "Cache-Control": "no-store",
-    },
-  });
+  // Pass the timestamped JSON straight through to the client.
+  const data = await upstream.json();
+  return Response.json(data, { headers: { "Cache-Control": "no-store" } });
 }

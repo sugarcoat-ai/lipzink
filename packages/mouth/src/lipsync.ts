@@ -153,6 +153,84 @@ export function wawaVisemeToShape(viseme: string): LipShape {
   return WAWA_VISEME_TO_SHAPE[viseme] ?? "rest"
 }
 
+// --- Scheduled cues (the "viseme stream" driver) -------------------------
+// A timeline of mouth shapes, each with the audio-clock time (seconds) it
+// should appear. Unlike live audio analysis (which can only ever *react* to
+// sound it already hears), cues are scheduled *against* playback, so the mouth
+// lands on the phoneme on time — even slightly ahead. Anything that knows the
+// timing of speech can build these: ElevenLabs character timestamps, Azure
+// viseme events, a forced aligner, or your own.
+
+/** Show `shape` from `time` (seconds on the audio clock) until the next cue. */
+export type ShapeCue = { time: number; shape: LipShape };
+
+/**
+ * The shape active at audio time `t`. Cues must be sorted ascending by `time`
+ * (the builders below guarantee this). Binary search keeps the per-frame
+ * lookup cheap even for long clips.
+ */
+export function cuesAt(cues: ShapeCue[], t: number): LipShape {
+  if (cues.length === 0) return "rest";
+  if (t <= cues[0].time) return cues[0].shape;
+  let lo = 0;
+  let hi = cues.length - 1;
+  let ans = 0;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    if (cues[mid].time <= t) {
+      ans = mid;
+      lo = mid + 1;
+    } else {
+      hi = mid - 1;
+    }
+  }
+  return cues[ans].shape;
+}
+
+// --- ElevenLabs character timestamps -> cues -----------------------------
+// ElevenLabs' `/with-timestamps` endpoints return the synthesized characters
+// alongside the start/end time of each. We map each character to a mouth shape
+// (graphemes, via charToShape) and emit a cue whenever the shape changes — a
+// compact, sorted timeline the `cues` driver can schedule against the audio.
+
+/** Character-level alignment as returned by ElevenLabs `/with-timestamps`. */
+export type ElevenLabsAlignment = {
+  characters: string[];
+  character_start_times_seconds: number[];
+  character_end_times_seconds: number[];
+};
+
+/**
+ * Build a {@link ShapeCue} timeline from ElevenLabs character alignment.
+ * Consecutive characters that share a shape collapse into one cue, whitespace
+ * closes the mouth (a "rest"), and the timeline is bookended with rests so the
+ * mouth starts and finishes closed.
+ */
+export function alignmentToCues(alignment: ElevenLabsAlignment): ShapeCue[] {
+  const { characters, character_start_times_seconds: starts } = alignment;
+  const cues: ShapeCue[] = [];
+  let prev: LipShape | null = null;
+  for (let i = 0; i < characters.length; i++) {
+    const ch = characters[i];
+    const time = starts[i] ?? 0;
+    const shape: LipShape = /[a-z]/i.test(ch) ? charToShape(ch) : "rest";
+    if (shape !== prev) {
+      cues.push({ time, shape });
+      prev = shape;
+    }
+  }
+  if (cues.length === 0 || cues[0].time > 0) {
+    cues.unshift({ time: 0, shape: "rest" });
+  }
+  // Close the mouth once the last character finishes.
+  const ends = alignment.character_end_times_seconds;
+  const end = ends?.[ends.length - 1];
+  if (end != null && cues[cues.length - 1].shape !== "rest") {
+    cues.push({ time: end, shape: "rest" });
+  }
+  return cues;
+}
+
 // --- Audio amplitude / brightness -> shape -------------------------------
 // When we only have raw audio (no viseme events), pick a plausible vowel-ish
 // shape from loudness + spectral brightness so the mouth still feels alive.

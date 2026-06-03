@@ -11,6 +11,7 @@ import {
   randomAvatar,
 } from "@avatalk/avatar"
 import {
+  fetchElevenLabsSpeech,
   type LipShape,
   LIP_SHAPES,
   LIP_SHAPE_LABELS,
@@ -43,33 +44,25 @@ function specText(config: AvatarConfig): string {
 
 /**
  * Connect ElevenLabs to the avatar. This lives in the *app*, not the library:
- * the avatar is voice-agnostic. We synthesize speech, wrap it in an <audio>,
- * and hand that element to the voice handle's `playAudio` — the mouth follows.
+ * the avatar is voice-agnostic. `/api/tts` proxies ElevenLabs' `/with-timestamps`
+ * endpoint; `fetchElevenLabsSpeech` decodes the audio and turns the character
+ * timestamps into a scheduled cue timeline, which `playCues` drives against the
+ * audio clock — so the mouth lands on each phoneme on time, not trailing it.
  */
 async function speakViaElevenLabs(
   text: string,
   voiceId: string,
   voice: AvatarVoiceHandle,
 ): Promise<void> {
-  const res = await fetch("/api/tts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, voiceId }),
-  })
-  if (!res.ok) {
-    const data = await res.json().catch(() => ({}))
-    throw new Error(data.error || `TTS failed (${res.status})`)
-  }
-  const url = URL.createObjectURL(await res.blob())
-  const audio = new Audio(url)
-  audio.addEventListener("ended", () => URL.revokeObjectURL(url), { once: true })
-  await voice.playAudio(audio)
+  const speech = await fetchElevenLabsSpeech("/api/tts", { text, voiceId })
+  await voice.playCues(speech.audio, speech.cues)
 }
 
 const INSTALL_CMD = "npm i @avatalk/avatar @avatalk/mouth"
 
 const AVATAR_SNIPPET = `import { useRef } from "react"
 import { Avatar, type AvatarVoiceHandle } from "@avatalk/avatar"
+import { fetchElevenLabsSpeech } from "@avatalk/mouth"
 import "@avatalk/avatar/styles.css"
 import "@avatalk/mouth/styles.css"
 
@@ -80,10 +73,11 @@ function Bubble() {
   const voice = useRef<AvatarVoiceHandle>(null)
   return (
     <button onClick={async () => {
-      // Bring your own audio — any TTS, a recording, anything:
-      const res = await fetch("/api/tts", { method: "POST", /* … */ })
-      const audio = new Audio(URL.createObjectURL(await res.blob()))
-      voice.current?.playAudio(audio)   // or .startMic() / .stop()
+      // ElevenLabs timestamps → on-time lip-sync. /api/tts proxies the
+      // \`/with-timestamps\` endpoint (keeps your key server-side):
+      const speech = await fetchElevenLabsSpeech("/api/tts", { text: "Hi!", voiceId })
+      voice.current?.playCues(speech.audio, speech.cues)
+      // No timestamps? Reactive fallback: .playAudio(url) / .startMic() / .stop()
     }}>
       <Avatar spec={spec} ref={voice} size={96} />
     </button>
@@ -365,13 +359,15 @@ export default function Page() {
           </li>
           <li>
             <span className="text-foreground font-medium">2 · Feed it audio.</span>{" "}
-            The library never does TTS — you bring the sound. Grab the{" "}
-            <code className="text-xs">ref</code> handle and call{" "}
-            <code className="text-xs">playAudio(urlOrElement)</code>,{" "}
-            <code className="text-xs">startMic()</code>, or{" "}
-            <code className="text-xs">stop()</code>. The mouth follows the audio
-            automatically. <code className="text-xs">onStatusChange</code> reports
-            state.
+            The library never does TTS — you bring the sound. Best results:{" "}
+            <code className="text-xs">fetchElevenLabsSpeech()</code> then{" "}
+            <code className="text-xs">playCues(audio, cues)</code> — ElevenLabs
+            timestamps schedule the mouth so it lands on each phoneme on time. No
+            timestamps? Fall back to{" "}
+            <code className="text-xs">playAudio(urlOrElement)</code> (reactive
+            analysis) or <code className="text-xs">startMic()</code>;{" "}
+            <code className="text-xs">stop()</code> closes the mouth.{" "}
+            <code className="text-xs">onStatusChange</code> reports state.
           </li>
           <li>
             <span className="text-foreground font-medium">3 · Or go headless.</span>{" "}

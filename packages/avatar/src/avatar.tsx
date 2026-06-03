@@ -1,7 +1,12 @@
 "use client"
 
 import { type Ref, useEffect, useImperativeHandle } from "react"
-import { type LipShape, type LipsyncStatus, useLipsync } from "@avatalk/mouth"
+import {
+  type LipShape,
+  type LipsyncStatus,
+  type ShapeCue,
+  useLipsync,
+} from "@avatalk/mouth"
 
 import { TalkingAvatar } from "./talking-avatar"
 import type { AvatarConfig } from "./avatar-model"
@@ -18,8 +23,17 @@ import type { AvatarConfig } from "./avatar-model"
  * to `playAudio`. See the demo app's `/api/tts` route for an example.
  */
 export type AvatarVoiceHandle = {
-  /** Drive the mouth from any audio you supply — a URL or your own <audio>. */
+  /**
+   * Drive the mouth by analysing any audio you supply — a URL or your own
+   * <audio>. Reactive: good for recordings or TTS without timing data.
+   */
   playAudio: (src: string | HTMLAudioElement) => Promise<void>
+  /**
+   * Drive the mouth from a scheduled cue timeline (e.g. ElevenLabs timestamps
+   * via `fetchElevenLabsSpeech`). The mouth lands on each phoneme on time
+   * rather than trailing the audio — the recommended path when you have timing.
+   */
+  playCues: (src: string | HTMLAudioElement, cues: ShapeCue[]) => Promise<void>
   /** Drive the mouth from the live microphone. */
   startMic: () => Promise<void>
   /** Stop playback / listening and close the mouth. */
@@ -63,8 +77,13 @@ export function Avatar({
 
   useImperativeHandle(
     ref,
-    () => ({ playAudio: lip.connect, startMic: lip.connectMic, stop: lip.stop }),
-    [lip.connect, lip.connectMic, lip.stop],
+    () => ({
+      playAudio: lip.connect,
+      playCues: lip.playCues,
+      startMic: lip.connectMic,
+      stop: lip.stop,
+    }),
+    [lip.connect, lip.playCues, lip.connectMic, lip.stop],
   )
 
   useEffect(() => {

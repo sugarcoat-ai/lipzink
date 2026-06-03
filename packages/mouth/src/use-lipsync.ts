@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Lipsync } from "wawa-lipsync"
 
-import { type LipShape, wawaVisemeToShape } from "./lipsync"
+import {
+  cuesAt,
+  type LipShape,
+  type ShapeCue,
+  wawaVisemeToShape,
+} from "./lipsync"
 
 export type LipsyncStatus = "idle" | "speaking" | "listening" | "error"
 
@@ -47,14 +52,73 @@ export class WawaAnalyser implements LipsyncAnalyser {
     this.manager.processAudio()
     return {
       shape: wawaVisemeToShape(this.manager.viseme),
-      amplitude: Math.min(1, (this.manager.features?.volume ?? 0) / 100),
+      // wawa's `volume` is already normalised to 0..1 (mean of per-band values,
+      // each /255), so it just needs clamping — the old `/100` pinned it to ~0.
+      amplitude: Math.min(1, this.manager.features?.volume ?? 0),
     }
+  }
+}
+
+/**
+ * A tiny loudness probe used by the scheduled `cues` driver: cues decide the
+ * mouth *shape* from timestamps, but we still measure real playback loudness so
+ * the mouth can open a touch wider on louder speech. It owns its own
+ * AudioContext + AnalyserNode and (like wawa) routes the element to the speakers
+ * so audio stays audible while we read it.
+ */
+class LoudnessMeter {
+  private ctx: AudioContext | null = null
+  private analyser: AnalyserNode | null = null
+  private data: Uint8Array<ArrayBuffer> | null = null
+  private source: MediaElementAudioSourceNode | null = null
+  private el: HTMLAudioElement | null = null
+
+  /** Route `el` through the meter. A no-op if it's already attached. */
+  attach(el: HTMLAudioElement): void {
+    if (this.el === el) {
+      void this.ctx?.resume()
+      return
+    }
+    if (!this.ctx) {
+      const Ctor =
+        window.AudioContext ||
+        (window as unknown as { webkitAudioContext: typeof AudioContext })
+          .webkitAudioContext
+      this.ctx = new Ctor()
+      this.analyser = this.ctx.createAnalyser()
+      this.analyser.fftSize = 1024
+      this.data = new Uint8Array(this.analyser.frequencyBinCount)
+    }
+    // A media element can only feed one source node; swap to the new element.
+    this.source?.disconnect()
+    this.source = this.ctx.createMediaElementSource(el)
+    this.source.connect(this.analyser!)
+    this.analyser!.connect(this.ctx.destination)
+    this.el = el
+    void this.ctx.resume()
+  }
+
+  /** Current loudness, 0..1. Returns 0 if nothing is attached. */
+  level(): number {
+    if (!this.analyser || !this.data) return 0
+    this.analyser.getByteFrequencyData(this.data)
+    let sum = 0
+    for (let i = 0; i < this.data.length; i++) sum += this.data[i]
+    // Mean bin energy, lifted a little so normal speech reads as lively.
+    return Math.min(1, (sum / this.data.length / 255) * 2.5)
   }
 }
 
 export type UseLipsyncOptions = WawaOptions & {
   /** Swap in your own detector. Defaults to {@link WawaAnalyser}. */
   analyser?: LipsyncAnalyser
+  /**
+   * Lead time (seconds) applied in the scheduled `cues` driver: the mouth reads
+   * the timeline at `currentTime + lookahead`, so the CSS morph *starts* just
+   * before the phoneme is heard and lands on time. Defaults to 0.05s. Bump it
+   * if the mouth still feels late; drop it toward 0 for strict alignment.
+   */
+  lookahead?: number
 }
 
 export type UseLipsyncReturn = {
@@ -65,12 +129,21 @@ export type UseLipsyncReturn = {
   status: LipsyncStatus
   error: string | null
   /**
-   * Drive the mouth from any audio you supply — a URL (we create the <audio>),
-   * or your own <audio> element (e.g. one already playing). This is the
-   * voice-agnostic entry point: bring ElevenLabs, OpenAI, a recording, anything.
+   * **Analyser driver.** Drive the mouth by analysing whatever audio you supply
+   * — a URL (we create the <audio>) or your own <audio> element. Reactive: the
+   * mouth follows the sound it hears, so it necessarily trails a little. Use it
+   * when you have audio but no timing data (a recording, a non-timestamped TTS).
    */
   connect: (src: string | HTMLAudioElement) => Promise<void>
-  /** Drive the mouth from the live microphone. */
+  /**
+   * **Cues driver.** Drive the mouth from a pre-built {@link ShapeCue} timeline
+   * scheduled against the audio clock — the mouth lands *on* each phoneme
+   * instead of trailing it. This is the voice-agnostic seam for any source that
+   * knows speech timing: ElevenLabs timestamps (see `alignmentToCues`), Azure
+   * viseme events, a forced aligner. Pass the audio plus its cues.
+   */
+  playCues: (src: string | HTMLAudioElement, cues: ShapeCue[]) => Promise<void>
+  /** Drive the mouth from the live microphone (analyser driver). */
   connectMic: () => Promise<void>
   /** Stop playback / listening and close the mouth. */
   stop: () => void
@@ -92,6 +165,11 @@ export function useLipsync(options: UseLipsyncOptions = {}): UseLipsyncReturn {
   const audioElRef = useRef<HTMLAudioElement | null>(null)
   const rafRef = useRef<number | null>(null)
   const objectUrlRef = useRef<string | null>(null)
+  // Which driver the animation loop is currently running.
+  const modeRef = useRef<"analyser" | "cues">("analyser")
+  // Scheduled-cue state (only used in "cues" mode).
+  const cuesRef = useRef<ShapeCue[]>([])
+  const meterRef = useRef<LoudnessMeter | null>(null)
 
   // Keep the latest options in a ref so the callbacks below stay stable.
   const optionsRef = useRef(options)
@@ -116,14 +194,23 @@ export function useLipsync(options: UseLipsyncOptions = {}): UseLipsyncReturn {
 
   const startLoop = useCallback(() => {
     stopLoop()
+    const lookahead = optionsRef.current.lookahead ?? 0.05
     const tick = () => {
-      const analyser = analyserRef.current
-      if (analyser) {
-        const frame = analyser.analyze()
-        // setState bails when unchanged, so the mouth only re-renders on a
-        // genuine viseme change; amplitude is a small number we update freely.
-        setShape(frame.shape)
-        setAmplitude(frame.amplitude)
+      if (modeRef.current === "cues") {
+        // Scheduled driver: shape comes from the timeline at the (look-ahead)
+        // audio clock; loudness is still measured so the mouth opens wider on
+        // louder speech. setState bails when the shape is unchanged.
+        const audio = audioElRef.current
+        const t = (audio?.currentTime ?? 0) + lookahead
+        setShape(cuesAt(cuesRef.current, t))
+        setAmplitude(meterRef.current?.level() ?? 0)
+      } else {
+        const analyser = analyserRef.current
+        if (analyser) {
+          const frame = analyser.analyze()
+          setShape(frame.shape)
+          setAmplitude(frame.amplitude)
+        }
       }
       rafRef.current = requestAnimationFrame(tick)
     }
@@ -146,6 +233,7 @@ export function useLipsync(options: UseLipsyncOptions = {}): UseLipsyncReturn {
     async (src: string | HTMLAudioElement) => {
       setError(null)
       try {
+        modeRef.current = "analyser"
         const analyser = ensureAnalyser()
 
         // Revoke any object URL we created for a previous clip.
@@ -183,9 +271,55 @@ export function useLipsync(options: UseLipsyncOptions = {}): UseLipsyncReturn {
     [ensureAnalyser, startLoop, stop, stopLoop],
   )
 
+  const playCues = useCallback(
+    async (src: string | HTMLAudioElement, cues: ShapeCue[]) => {
+      setError(null)
+      try {
+        modeRef.current = "cues"
+        cuesRef.current = cues
+
+        // Resolve the audio element (reuse our own for URLs; adopt yours as-is).
+        let audio: HTMLAudioElement
+        if (typeof src === "string") {
+          if (!audioElRef.current) {
+            audioElRef.current = new Audio()
+            audioElRef.current.addEventListener("ended", () => stop())
+          }
+          audio = audioElRef.current
+          audio.src = src
+        } else {
+          audio = src
+          if (!audio.onended) audio.addEventListener("ended", () => stop())
+          audioElRef.current = audio
+        }
+
+        // Measure loudness for the amplitude meter. If the audio graph can't be
+        // built (e.g. the element is already wired elsewhere), fall back to a
+        // flat amplitude rather than failing the whole playback.
+        try {
+          if (!meterRef.current) meterRef.current = new LoudnessMeter()
+          meterRef.current.attach(audio)
+        } catch {
+          meterRef.current = null
+        }
+
+        setStatus("speaking")
+        startLoop()
+        if (audio.paused) await audio.play()
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not play audio")
+        setStatus("error")
+        stopLoop()
+        setShape("rest")
+      }
+    },
+    [startLoop, stop, stopLoop],
+  )
+
   const connectMic = useCallback(async () => {
     setError(null)
     try {
+      modeRef.current = "analyser"
       const analyser = ensureAnalyser()
       await analyser.connectMicrophone()
       setStatus("listening")
@@ -205,5 +339,5 @@ export function useLipsync(options: UseLipsyncOptions = {}): UseLipsyncReturn {
     }
   }, [stopLoop])
 
-  return { shape, amplitude, status, error, connect, connectMic, stop }
+  return { shape, amplitude, status, error, connect, playCues, connectMic, stop }
 }

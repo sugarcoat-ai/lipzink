@@ -3,7 +3,7 @@
 import { type Ref, useEffect, useImperativeHandle } from "react"
 
 import { Mouth } from "./mouth"
-import type { LipShape } from "./lipsync"
+import type { LipShape, ShapeCue } from "./lipsync"
 import {
   type LipsyncStatus,
   type UseLipsyncOptions,
@@ -12,8 +12,13 @@ import {
 
 /** Imperative handle for driving the mouth yourself. */
 export type TalkingMouthHandle = {
-  /** Lip-sync a URL or an <audio> element. */
+  /** Lip-sync a URL or an <audio> element by analysing it (reactive driver). */
   play: (src: string | HTMLAudioElement) => Promise<void>
+  /**
+   * Lip-sync from a scheduled cue timeline (e.g. ElevenLabs timestamps). The
+   * mouth lands on each phoneme on time instead of trailing the audio.
+   */
+  playCues: (src: string | HTMLAudioElement, cues: ShapeCue[]) => Promise<void>
   /** Lip-sync the live microphone. */
   listen: () => Promise<void>
   /** Stop and close the mouth. */
@@ -57,13 +62,13 @@ export function TalkingMouth({
   onStatusChange,
   ref,
 }: TalkingMouthProps) {
-  const { shape, amplitude, status, connect, connectMic, stop } =
+  const { shape, amplitude, status, connect, playCues, connectMic, stop } =
     useLipsync(options)
 
   useImperativeHandle(
     ref,
-    () => ({ play: connect, listen: connectMic, stop }),
-    [connect, connectMic, stop],
+    () => ({ play: connect, playCues, listen: connectMic, stop }),
+    [connect, playCues, connectMic, stop],
   )
 
   // Auto-connect when the `audio` prop changes.
