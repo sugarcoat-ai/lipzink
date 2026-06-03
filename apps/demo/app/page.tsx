@@ -1,7 +1,25 @@
 "use client"
 
-import { useRef, useState } from "react"
-import { Check, Copy, Mic, Play, Shuffle, Square, Volume2 } from "lucide-react"
+import { useEffect, useRef, useState } from "react"
+import {
+  ArrowUpRight,
+  AudioLines,
+  Boxes,
+  Check,
+  Copy,
+  Gauge,
+  type LucideIcon,
+  MessageSquare,
+  Mic,
+  Package,
+  Palette,
+  Play,
+  Shuffle,
+  Sparkles,
+  Square,
+  Volume2,
+  Wand2,
+} from "lucide-react"
 
 import {
   Avatar,
@@ -16,19 +34,26 @@ import {
   LIP_SHAPES,
   LIP_SHAPE_LABELS,
   type LipsyncStatus,
+  Mouth,
   TalkingMouth,
   type TalkingMouthHandle,
 } from "@avatalk/mouth"
 import { PartCarousel } from "@/components/avatar/part-picker"
+import { CodeWindow } from "@/components/site/code-window"
+import { MonaLisa } from "@/components/site/mona-lisa"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
 import { setAvatarConfig, useAvatarConfig } from "@/lib/use-avatar"
 
-// Categories split across the two flanks of the avatar (mouth is excluded —
-// it's the animated talking mouth, driven by audio, not a static part).
+// A phonetic pangram — unlike the letter pangram "the quick brown fox…", this
+// sentence exercises (close to) every English phoneme, so the mouth runs
+// through its whole repertoire of shapes.
+const PANGRAM =
+  "The beige hue on the waters of the loch impressed all, including the French queen, before she heard that symphony again."
+
 const LEFT_PARTS: AvatarCategory[] = ["hair", "glasses", "beard", "accessories"]
 const RIGHT_PARTS: AvatarCategory[] = ["face", "eyebrows", "eyes", "nose", "details"]
 
-// ElevenLabs stock voices (only used by "Speak", which needs an API key).
 const VOICES = [
   { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel" },
   { id: "AZnzlk1XvdvUeBnXmlld", name: "Domi" },
@@ -37,86 +62,131 @@ const VOICES = [
   { id: "TxGEqnHWrfWFTfGW9XjX", name: "Josh" },
 ]
 
-// The spec the <Avatar/> component consumes.
+const INSTALL_CMD = "npm i @avatalk/avatar @avatalk/mouth"
+const REPO_URL = "https://github.com/"
+
 function specText(config: AvatarConfig): string {
   return JSON.stringify(config, null, 2)
 }
 
 /**
- * Connect ElevenLabs to the avatar. This lives in the *app*, not the library:
- * the avatar is voice-agnostic. `/api/tts` proxies ElevenLabs' `/with-timestamps`
- * endpoint; `fetchElevenLabsSpeech` decodes the audio and turns the character
- * timestamps into a scheduled cue timeline, which `playCues` drives against the
- * audio clock — so the mouth lands on each phoneme on time, not trailing it.
+ * App-side glue: synthesize speech with ElevenLabs and drive the avatar from
+ * the returned character timestamps. The library itself never does TTS.
  */
-async function speakViaElevenLabs(
+async function speak(
+  voice: AvatarVoiceHandle,
   text: string,
   voiceId: string,
-  voice: AvatarVoiceHandle,
 ): Promise<void> {
   const speech = await fetchElevenLabsSpeech("/api/tts", { text, voiceId })
   await voice.playCues(speech.audio, speech.cues)
 }
 
-const INSTALL_CMD = "npm i @avatalk/avatar @avatalk/mouth"
+// --- Code samples ---------------------------------------------------------
 
-const AVATAR_SNIPPET = `import { useRef } from "react"
+const HERO_CODE = `import { Avatar } from "@avatalk/avatar"
+import "@avatalk/avatar/styles.css"
+
+// "spec" is the JSON you build & copy below
+export function Hi({ spec }) {
+  return <Avatar spec={spec} size={96} />
+}`
+
+const ELEVEN_CODE = `import { useRef } from "react"
 import { Avatar, type AvatarVoiceHandle } from "@avatalk/avatar"
 import { fetchElevenLabsSpeech } from "@avatalk/mouth"
 import "@avatalk/avatar/styles.css"
 import "@avatalk/mouth/styles.css"
 
-// Paste the spec you copied above:
-const spec = { /* … */ }
-
-function Bubble() {
+function Talking({ spec }) {
   const voice = useRef<AvatarVoiceHandle>(null)
+
+  async function say(text: string) {
+    // /api/tts proxies ElevenLabs' /with-timestamps (key stays server-side).
+    const { audio, cues } = await fetchElevenLabsSpeech("/api/tts", {
+      text,
+      voiceId: "21m00Tcm4TlvDq8ikWAM",
+    })
+    // Scheduled against the audio clock → lands on every phoneme, on time.
+    voice.current?.playCues(audio, cues)
+  }
+
+  return <Avatar spec={spec} ref={voice} onClick={() => say("Hello there!")} />
+}`
+
+const ANY_AUDIO_CODE = `import { useRef } from "react"
+import { Avatar, type AvatarVoiceHandle } from "@avatalk/avatar"
+import "@avatalk/avatar/styles.css"
+import "@avatalk/mouth/styles.css"
+
+function Talking({ spec }) {
+  const voice = useRef<AvatarVoiceHandle>(null)
+
+  // No timestamps? Hand it ANY audio — a recording, OpenAI TTS, a URL — and
+  // the mouth follows it live (reactive analysis). Or open the microphone.
   return (
-    <button onClick={async () => {
-      // ElevenLabs timestamps → on-time lip-sync. /api/tts proxies the
-      // \`/with-timestamps\` endpoint (keeps your key server-side):
-      const speech = await fetchElevenLabsSpeech("/api/tts", { text: "Hi!", voiceId })
-      voice.current?.playCues(speech.audio, speech.cues)
-      // No timestamps? Reactive fallback: .playAudio(url) / .startMic() / .stop()
-    }}>
-      <Avatar spec={spec} ref={voice} size={96} />
-    </button>
+    <Avatar
+      spec={spec}
+      ref={voice}
+      onClick={() => voice.current?.playAudio("/hello.mp3")}
+    />
+    // voice.current?.startMic()  ·  voice.current?.stop()
   )
 }`
 
-const MOUTH_SNIPPET = `import { TalkingMouth } from "@avatalk/mouth"
+const MOUTH_CODE = `import { TalkingMouth } from "@avatalk/mouth"
 import "@avatalk/mouth/styles.css"
 
-// Drop the mouth onto YOUR OWN illustration — no avatar required:
-function MyCharacter({ audioUrl }: { audioUrl: string }) {
+// Just the mouth — no avatar, no bundled art. Overlay it on your illustration:
+function MyCharacter() {
   return (
     <div style={{ position: "relative" }}>
-      <img src="/my-character.png" alt="" />
-      <div style={{ position: "absolute", left: "50%", top: "62%", transform: "translate(-50%,-50%)" }}>
-        <TalkingMouth audio={audioUrl} scale={1.4} />
+      <img src="/character.png" alt="" />
+      <div style={{ position: "absolute", left: "50%", top: "62%",
+                    transform: "translate(-50%,-50%)" }}>
+        <TalkingMouth audio="/hello.mp3" scale={1.4} />
       </div>
     </div>
   )
-}
+}`
 
-// Or go fully headless and render whatever you like:
-//   const { shape, amplitude } = useLipsync()
-//   ls.connect(myAudioElement)`
+const OWN_FACE_CODE = `import { useRef } from "react"
+import { TalkingMouth, type TalkingMouthHandle } from "@avatalk/mouth"
+import "@avatalk/mouth/styles.css"
 
-/** A copy-to-clipboard button that flips to a check for a moment. */
+function Portrait() {
+  const mouth = useRef<TalkingMouthHandle>(null)
+  return (
+    <div style={{ position: "relative" }}>
+      <img src="/mona-lisa.png" alt="Mona Lisa" />
+      {/* Position + tint the mouth to match YOUR art */}
+      <div style={{ position: "absolute", left: "50%", top: "56%",
+                    transform: "translate(-50%,-50%)" }}>
+        <TalkingMouth ref={mouth} scale={0.7} cavity="#7a1f1f" tongue="#c75c5c" />
+      </div>
+      <button onClick={() => mouth.current?.play("/hello.mp3")}>Speak</button>
+    </div>
+  )
+}`
+
+// --- Small building blocks -----------------------------------------------
+
 function CopyButton({
   value,
   children,
   variant = "outline",
+  size = "default",
 }: {
   value: string
   children: React.ReactNode
   variant?: "outline" | "ghost" | "secondary"
+  size?: "default" | "sm"
 }) {
   const [copied, setCopied] = useState(false)
   return (
     <Button
       variant={variant}
+      size={size}
       onClick={() => {
         void navigator.clipboard?.writeText(value)
         setCopied(true)
@@ -129,335 +199,540 @@ function CopyButton({
   )
 }
 
+function SectionHeader({
+  kicker,
+  title,
+  children,
+}: {
+  kicker: string
+  title: string
+  children?: React.ReactNode
+}) {
+  return (
+    <div className="mb-8 max-w-2xl">
+      <div className="kicker mb-3">{kicker}</div>
+      <h2 className="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
+        {title}
+      </h2>
+      {children && (
+        <p className="text-muted-foreground mt-3 text-[15px] leading-relaxed">
+          {children}
+        </p>
+      )}
+    </div>
+  )
+}
+
+function Section({
+  id,
+  className,
+  children,
+}: {
+  id?: string
+  className?: string
+  children: React.ReactNode
+}) {
+  return (
+    <section
+      id={id}
+      className={cn(
+        "mx-auto max-w-6xl scroll-mt-20 border-t border-border/70 px-6 py-20 sm:py-24",
+        className,
+      )}
+    >
+      {children}
+    </section>
+  )
+}
+
+// --- Page ----------------------------------------------------------------
+
 export default function Page() {
   const config = useAvatarConfig()
-  const [text, setText] = useState("Hi! I'm your avatar — give me something to say.")
+  const [text, setText] = useState(PANGRAM)
   const [voiceId, setVoiceId] = useState(VOICES[0].id)
   const [status, setStatus] = useState<LipsyncStatus>("idle")
   const [synthesizing, setSynthesizing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  // When set, freezes the avatar's mouth to a chosen viseme (overrides audio).
-  const [previewShape, setPreviewShape] = useState<LipShape | null>(null)
 
-  // The avatar's imperative voice handle (the library's "pass audio" surface).
   const voice = useRef<AvatarVoiceHandle>(null)
-  // The standalone mouth demo's handle (no avatar involved).
-  const mouth = useRef<TalkingMouthHandle>(null)
+  const randomized = useRef(false)
+
+  // Greet visitors with a fresh, random face (only if they have no saved one).
+  useEffect(() => {
+    if (randomized.current) return
+    randomized.current = true
+    if (!window.localStorage.getItem("avatalk:avatar")) {
+      setAvatarConfig(randomAvatar())
+    }
+  }, [])
 
   const busy = status === "speaking" || status === "listening" || synthesizing
 
-  async function handleSpeak() {
+  async function handleTalk() {
     if (!voice.current) return
     setError(null)
-    setPreviewShape(null)
     setSynthesizing(true)
     try {
-      await speakViaElevenLabs(text, voiceId, voice.current)
+      await speak(voice.current, text, voiceId)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong")
+      // No API key / quota? Still show off the mouth with the bundled sample.
+      setError(
+        err instanceof Error
+          ? `${err.message} — playing the sample instead.`
+          : "Speech failed — playing the sample instead.",
+      )
+      try {
+        await voice.current.playAudio("/sample-tts.mp3")
+      } catch {
+        /* ignore */
+      }
     } finally {
       setSynthesizing(false)
     }
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
-      <header className="mb-8 flex items-end justify-between gap-4">
-        <div>
-          <h1 className="font-mono text-lg font-semibold tracking-tight">avatalk</h1>
-          <p className="text-muted-foreground mt-1 max-w-xl text-sm">
-            A voice-agnostic lip-sync mouth (
-            <code className="text-xs">@avatalk/mouth</code>) and a notion-style
-            talking avatar (<code className="text-xs">@avatalk/avatar</code>).
-            Build one, feed it any audio, and drop it into your app.
-          </p>
+    <div className="min-h-dvh">
+      {/* ---------- Nav ---------- */}
+      <header className="bg-background/80 sticky top-0 z-50 border-b backdrop-blur-md">
+        <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
+          <span className="font-mono text-sm font-semibold tracking-tight">
+            avatalk
+          </span>
+          <span className="bg-muted text-muted-foreground hidden rounded-full px-2 py-0.5 font-mono text-[10px] sm:inline">
+            v0.1
+          </span>
+          <nav className="ml-auto flex items-center gap-1">
+            <CopyButton value={INSTALL_CMD} variant="ghost" size="sm">
+              <span className="hidden font-mono text-xs sm:inline">npm i</span>
+            </CopyButton>
+            <Button asChild variant="ghost" size="sm">
+              <a href={REPO_URL} target="_blank" rel="noreferrer">
+                GitHub <ArrowUpRight className="size-4" />
+              </a>
+            </Button>
+          </nav>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => setAvatarConfig(randomAvatar())}
-        >
-          <Shuffle className="size-4" /> Randomize
-        </Button>
       </header>
 
-      {/* Studio: carousels flank the avatar (stacks on mobile). */}
-      <section className="grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
-        <div className="order-2 flex flex-col gap-5 lg:order-1">
-          {LEFT_PARTS.map((cat) => (
-            <PartCarousel key={cat} category={cat} config={config} align="right" />
-          ))}
-        </div>
-
-        <div className="order-1 flex flex-col items-center gap-4 lg:order-2">
-          <Avatar
-            spec={config}
-            ref={voice}
-            shape={previewShape ?? undefined}
-            onStatusChange={setStatus}
-            size={300}
-            className="shadow-sm ring-1 ring-black/5"
-          />
-          <div className="text-muted-foreground font-mono text-[11px]">
-            {previewShape
-              ? `viseme · ${LIP_SHAPE_LABELS[previewShape]}`
-              : synthesizing
-                ? "synthesizing…"
-                : status === "idle"
-                  ? "ready"
-                  : status === "speaking"
-                    ? "speaking…"
-                    : status === "listening"
-                      ? "listening…"
-                      : "error"}
+      {/* ---------- Hero ---------- */}
+      <section className="relative overflow-hidden">
+        <div className="bg-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]" />
+        <div className="relative mx-auto max-w-6xl px-6 pt-16 pb-20 sm:pt-24">
+          <div className="mx-auto max-w-2xl text-center">
+            <a
+              href="#build"
+              className="text-muted-foreground hover:text-foreground hover:border-foreground/30 mb-6 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-xs transition-colors"
+            >
+              <Sparkles className="size-3.5" />
+              voice-agnostic lip-sync for React
+            </a>
+            <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
+              Make your avatar talk.
+            </h1>
+            <p className="text-muted-foreground mx-auto mt-5 max-w-xl text-base leading-relaxed text-pretty sm:text-lg">
+              A notion-style talking avatar and a pure-CSS lip-sync mouth. Build a
+              face, feed it any audio — ElevenLabs, a recording, the mic — and the
+              mouth follows every phoneme. Then drop it into your app.
+            </p>
           </div>
-        </div>
 
-        <div className="order-3 flex flex-col gap-5">
-          {RIGHT_PARTS.map((cat) => (
-            <PartCarousel key={cat} category={cat} config={config} align="left" />
-          ))}
+          {/* Talking avatar + console */}
+          <div className="mx-auto mt-12 grid max-w-4xl items-center gap-8 md:grid-cols-[auto_minmax(0,1fr)]">
+            <div className="animate-rise flex flex-col items-center gap-3 justify-self-center">
+              <div
+                className="rounded-[2rem] p-5 shadow-sm ring-1 ring-black/5"
+                style={{ background: "#f5f1ea" }}
+              >
+                <Avatar
+                  spec={config}
+                  ref={voice}
+                  onStatusChange={setStatus}
+                  size={240}
+                />
+              </div>
+              <StatusPill status={status} synthesizing={synthesizing} />
+            </div>
+
+            <div className="bg-card animate-rise w-full rounded-2xl border p-4 shadow-sm sm:p-5">
+              <label className="kicker mb-2 block">say something</label>
+              <textarea
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                rows={3}
+                className="focus-visible:ring-ring/40 w-full resize-none rounded-lg border bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none focus-visible:ring-2"
+                placeholder="Type something for the avatar to say…"
+              />
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <select
+                  value={voiceId}
+                  onChange={(e) => setVoiceId(e.target.value)}
+                  className="bg-background h-8 rounded-lg border px-2 text-sm outline-none"
+                  aria-label="Voice"
+                >
+                  {VOICES.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.name}
+                    </option>
+                  ))}
+                </select>
+
+                <div className="ml-auto flex flex-wrap gap-2">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => voice.current?.playAudio("/sample-tts.mp3")}
+                    disabled={busy}
+                  >
+                    <Play className="size-4" /> Sample
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => voice.current?.startMic()}
+                    disabled={busy}
+                  >
+                    <Mic className="size-4" /> Mic
+                  </Button>
+                  {busy ? (
+                    <Button size="sm" variant="secondary" onClick={() => voice.current?.stop()}>
+                      <Square className="size-4" /> Stop
+                    </Button>
+                  ) : (
+                    <Button size="sm" onClick={handleTalk} disabled={!text.trim()}>
+                      <Volume2 className="size-4" /> Make it talk
+                    </Button>
+                  )}
+                </div>
+              </div>
+              {error ? (
+                <p className="text-muted-foreground mt-2.5 text-xs">{error}</p>
+              ) : (
+                <p className="text-muted-foreground mt-2.5 text-xs">
+                  That’s a phonetic pangram — every English sound.{" "}
+                  <span className="opacity-70">
+                    “Sample” needs no key; “Make it talk” uses ElevenLabs via{" "}
+                    <code>/api/tts</code>.
+                  </span>
+                </p>
+              )}
+            </div>
+          </div>
+
+          {/* Simple example of the Avatar code */}
+          <div className="mx-auto mt-10 max-w-xl">
+            <CodeWindow
+              tabs={[{ label: "Avatar", file: "hi.tsx", code: HERO_CODE }]}
+            />
+          </div>
         </div>
       </section>
 
-      {/* Control bar: say something, play, and export the spec. */}
-      <section className="mx-auto mt-10 max-w-3xl space-y-3">
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          rows={2}
-          className="focus-visible:ring-ring w-full resize-none rounded-md border bg-transparent px-3 py-2 text-sm outline-none focus-visible:ring-2"
-          placeholder="Type something for the avatar to say…"
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="text-muted-foreground text-sm">Voice</label>
-          <select
-            value={voiceId}
-            onChange={(e) => setVoiceId(e.target.value)}
-            className="rounded-md border bg-transparent px-2 py-1.5 text-sm outline-none"
-          >
-            {VOICES.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.name}
-              </option>
-            ))}
-          </select>
-
-          <div className="ml-auto flex flex-wrap gap-2">
-            {busy ? (
-              <Button onClick={() => voice.current?.stop()} variant="secondary">
-                <Square className="size-4" /> Stop
-              </Button>
-            ) : (
-              <>
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setPreviewShape(null)
-                    voice.current?.playAudio("/sample-tts.mp3")
-                  }}
-                >
-                  <Play className="size-4" /> Play sample
-                </Button>
-                <Button
-                  variant="outline"
-                  onClick={() => {
-                    setPreviewShape(null)
-                    voice.current?.startMic()
-                  }}
-                >
-                  <Mic className="size-4" /> Test mic
-                </Button>
-                <Button onClick={handleSpeak} disabled={synthesizing || !text.trim()}>
-                  <Volume2 className="size-4" />
-                  {synthesizing ? "Synthesizing…" : "Speak"}
-                </Button>
-              </>
-            )}
+      {/* ---------- Step 01 · Build ---------- */}
+      <Section id="build">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <SectionHeader kicker="Step 01 · Create" title="Build your avatar">
+            Click through the parts — or roll the dice. The avatar above updates
+            live. When you like it, copy the spec: a tiny JSON blob you pass to{" "}
+            <code className="text-xs">&lt;Avatar spec /&gt;</code>.
+          </SectionHeader>
+          <div className="mb-8 flex gap-2">
+            <Button variant="outline" onClick={() => setAvatarConfig(randomAvatar())}>
+              <Shuffle className="size-4" /> Randomize
+            </Button>
             <CopyButton value={specText(config)}>Copy spec</CopyButton>
           </div>
         </div>
-        {error && <p className="text-destructive text-sm">{error}</p>}
-        <p className="text-muted-foreground text-xs">
-          “Play sample” needs no API key. “Speak” uses ElevenLabs via{" "}
-          <code>/api/tts</code> — set <code>ELEVENLABS_API_KEY</code> to enable it.
-        </p>
-      </section>
 
-      {/* Viseme palette: click to freeze the avatar's mouth on a shape. */}
-      <section className="mx-auto mt-12 max-w-3xl border-t pt-10">
-        <div className="flex items-baseline justify-between gap-3">
-          <h2 className="font-mono text-sm font-semibold tracking-tight">
-            Supported visemes
-          </h2>
-          {previewShape && (
-            <button
-              type="button"
-              onClick={() => setPreviewShape(null)}
-              className="text-muted-foreground hover:text-foreground font-mono text-xs"
+        <div className="grid items-center gap-8 lg:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+          <div className="order-2 flex flex-col gap-5 lg:order-1">
+            {LEFT_PARTS.map((cat) => (
+              <PartCarousel key={cat} category={cat} config={config} align="right" />
+            ))}
+          </div>
+          <div className="order-1 flex justify-center lg:order-2">
+            <div
+              className="rounded-[2rem] p-5 ring-1 ring-black/5"
+              style={{ background: "#f5f1ea" }}
             >
-              resume live ✕
-            </button>
-          )}
+              <Avatar spec={config} size={260} />
+            </div>
+          </div>
+          <div className="order-3 flex flex-col gap-5">
+            {RIGHT_PARTS.map((cat) => (
+              <PartCarousel key={cat} category={cat} config={config} align="left" />
+            ))}
+          </div>
         </div>
-        <p className="text-muted-foreground mt-1 text-sm">
-          The {LIP_SHAPES.length} mouth shapes the lip-sync model maps every
-          phoneme onto. Click one to see it on the avatar above; play audio to
-          resume live lip-sync.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          {LIP_SHAPES.map((s) => {
-            const active = previewShape === s
-            return (
-              <button
-                key={s}
-                type="button"
-                aria-pressed={active}
-                onClick={() => {
-                  if (active) {
-                    setPreviewShape(null)
-                    return
-                  }
-                  voice.current?.stop()
-                  setPreviewShape(s)
-                }}
-                className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
-                  active
-                    ? "border-foreground bg-foreground text-background"
-                    : "border-border text-muted-foreground hover:bg-muted hover:text-foreground"
-                }`}
-                title={s}
-              >
-                {LIP_SHAPE_LABELS[s]}
-              </button>
-            )
-          })}
+      </Section>
+
+      {/* ---------- Step 02 · Voice / code ---------- */}
+      <Section id="voice">
+        <SectionHeader kicker="Step 02 · Give it a voice" title="Two lines to talking">
+          The avatar is voice-agnostic — you bring the sound. With ElevenLabs
+          timestamps the mouth lands on every phoneme on time; with any other
+          audio it follows along live. Pick your lane:
+        </SectionHeader>
+
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <CodeWindow
+            tabs={[
+              { label: "With ElevenLabs", file: "talking.tsx", code: ELEVEN_CODE },
+              { label: "Any audio / mic", file: "talking.tsx", code: ANY_AUDIO_CODE },
+            ]}
+          />
+          <VisemeExplorer />
         </div>
-      </section>
+      </Section>
 
-      {/* Standalone mouth: the lip-sync mouth on a non-avatar illustration. */}
-      <StandaloneMouthDemo mouth={mouth} />
+      {/* ---------- Case 02 · Mouth only ---------- */}
+      <Section id="mouth">
+        <SectionHeader kicker="Use case 02 · Mouth only" title="Just the mouth">
+          Don’t need the whole character? <code className="text-xs">@avatalk/mouth</code>{" "}
+          is a standalone, pure-CSS mouth — no avatar, no assets. Position it over
+          any illustration and tint it to match.
+        </SectionHeader>
 
-      {/* Usage docs. */}
-      <section className="mx-auto mt-14 max-w-3xl border-t pt-10">
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-mono text-sm font-semibold tracking-tight">
-            Use it in your app
-          </h2>
-          <CopyButton value={INSTALL_CMD} variant="ghost">
-            {INSTALL_CMD}
+        <div className="grid items-center gap-8 lg:grid-cols-[auto_minmax(0,1fr)]">
+          <StandaloneMouthDemo />
+          <CodeWindow
+            tabs={[{ label: "Mouth", file: "character.tsx", code: MOUTH_CODE }]}
+          />
+        </div>
+      </Section>
+
+      {/* ---------- Case 03 · Your own face ---------- */}
+      <Section id="own">
+        <SectionHeader kicker="Use case 03 · Bring your own face" title="Put a mouth on anything">
+          The mouth is just a positioned CSS element — so it works on a photo, an
+          illustration, even a Renaissance masterpiece. Here she is, finally able
+          to answer the question everyone asks.
+        </SectionHeader>
+
+        <div className="grid items-center gap-10 lg:grid-cols-[auto_minmax(0,1fr)]">
+          <MonaLisaDemo />
+          <CodeWindow
+            tabs={[{ label: "Your art", file: "portrait.tsx", code: OWN_FACE_CODE }]}
+          />
+        </div>
+      </Section>
+
+      {/* ---------- Features ---------- */}
+      <Section id="features">
+        <SectionHeader kicker="Everything else" title="Built to drop in">
+          Small, typed, and unopinionated about your stack.
+        </SectionHeader>
+        <div className="grid gap-px overflow-hidden rounded-2xl border bg-border/70 sm:grid-cols-2 lg:grid-cols-4">
+          {FEATURES.map((f) => (
+            <Feature key={f.title} {...f} />
+          ))}
+        </div>
+      </Section>
+
+      {/* ---------- Footer ---------- */}
+      <footer className="border-t">
+        <div className="text-muted-foreground mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-10 text-sm sm:flex-row">
+          <div className="flex items-center gap-2">
+            <span className="font-mono font-semibold tracking-tight">avatalk</span>
+            <span className="text-muted-foreground/70">·</span>
+            <span>MIT licensed</span>
+          </div>
+          <CopyButton value={INSTALL_CMD} variant="ghost" size="sm">
+            <span className="font-mono text-xs">{INSTALL_CMD}</span>
           </CopyButton>
         </div>
-        <ol className="text-muted-foreground mt-4 space-y-4 text-sm">
-          <li>
-            <span className="text-foreground font-medium">1 · Pick a layer.</span>{" "}
-            Want the whole character? Use{" "}
-            <code className="text-xs">&lt;Avatar spec /&gt;</code> from{" "}
-            <code className="text-xs">@avatalk/avatar</code> (it bundles its own
-            art). Just need the mouth on your own illustration? Use{" "}
-            <code className="text-xs">@avatalk/mouth</code> — no avatar, no assets.
-          </li>
-          <li>
-            <span className="text-foreground font-medium">2 · Feed it audio.</span>{" "}
-            The library never does TTS — you bring the sound. Best results:{" "}
-            <code className="text-xs">fetchElevenLabsSpeech()</code> then{" "}
-            <code className="text-xs">playCues(audio, cues)</code> — ElevenLabs
-            timestamps schedule the mouth so it lands on each phoneme on time. No
-            timestamps? Fall back to{" "}
-            <code className="text-xs">playAudio(urlOrElement)</code> (reactive
-            analysis) or <code className="text-xs">startMic()</code>;{" "}
-            <code className="text-xs">stop()</code> closes the mouth.{" "}
-            <code className="text-xs">onStatusChange</code> reports state.
-          </li>
-          <li>
-            <span className="text-foreground font-medium">3 · Or go headless.</span>{" "}
-            <code className="text-xs">useLipsync()</code> exposes{" "}
-            <code className="text-xs">{"{ shape, amplitude, status }"}</code> so you
-            can build your own visuals — or swap the analyser entirely. Driving the
-            mouth from TTS viseme events instead? Map them with{" "}
-            <code className="text-xs">azureVisemeToShape()</code> and feed{" "}
-            <code className="text-xs">&lt;Mouth shape /&gt;</code> directly.
-          </li>
-        </ol>
-
-        <div className="mt-6 grid gap-6 md:grid-cols-2">
-          <Snippet title="Whole avatar (@avatalk/avatar)" code={AVATAR_SNIPPET} />
-          <Snippet title="Just the mouth (@avatalk/mouth)" code={MOUTH_SNIPPET} />
-        </div>
-      </section>
-    </main>
+      </footer>
+    </div>
   )
 }
 
-/** A labelled, copyable code block. */
-function Snippet({ title, code }: { title: string; code: string }) {
+// --- Status pill ----------------------------------------------------------
+
+function StatusPill({
+  status,
+  synthesizing,
+}: {
+  status: LipsyncStatus
+  synthesizing: boolean
+}) {
+  const label = synthesizing
+    ? "synthesizing…"
+    : status === "speaking"
+      ? "speaking…"
+      : status === "listening"
+        ? "listening…"
+        : status === "error"
+          ? "error"
+          : "ready"
+  const live = synthesizing || status === "speaking" || status === "listening"
   return (
-    <div className="relative">
-      <div className="text-muted-foreground mb-1.5 font-mono text-[11px]">
-        {title}
+    <span className="text-muted-foreground inline-flex items-center gap-2 font-mono text-[11px]">
+      <span
+        className={cn(
+          "size-1.5 rounded-full",
+          live ? "animate-pulse bg-emerald-500" : "bg-muted-foreground/40",
+        )}
+      />
+      {label}
+    </span>
+  )
+}
+
+// --- Viseme explorer (inline mouth + chips) -------------------------------
+
+function VisemeExplorer() {
+  const [shape, setShape] = useState<LipShape>("aei")
+  return (
+    <div className="bg-card flex flex-col rounded-2xl border p-5">
+      <div className="kicker mb-1">13 shapes · every phoneme</div>
+      <p className="text-muted-foreground mb-4 text-sm">
+        Whatever drives the mouth — timestamps, live audio, the mic — resolves to
+        one of these. Tap to preview.
+      </p>
+      <div
+        className="mb-4 flex items-center justify-center rounded-xl py-8"
+        style={{ background: "#f5f1ea" }}
+      >
+        <Mouth shape={shape} scale={1.6} cavity="#7a1f1f" tongue="#c75c5c" />
       </div>
-      <pre className="bg-muted/50 overflow-x-auto rounded-lg border p-4 font-mono text-xs leading-relaxed">
-        {code}
-      </pre>
-      <div className="absolute right-2 top-7">
-        <CopyButton value={code} variant="secondary">
-          Copy
-        </CopyButton>
+      <div className="flex flex-wrap gap-1.5">
+        {LIP_SHAPES.map((s) => (
+          <button
+            key={s}
+            type="button"
+            aria-pressed={shape === s}
+            onClick={() => setShape(s)}
+            className={cn(
+              "rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors",
+              shape === s
+                ? "border-foreground bg-foreground text-background"
+                : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+            )}
+          >
+            {LIP_SHAPE_LABELS[s]}
+          </button>
+        ))}
       </div>
     </div>
   )
 }
 
-/**
- * Proof that the mouth stands alone: a simple non-notion face (just CSS) with
- * <TalkingMouth> overlaid. No <Avatar>, no bundled art — only @avatalk/mouth.
- */
-function StandaloneMouthDemo({
-  mouth,
-}: {
-  mouth: React.RefObject<TalkingMouthHandle | null>
-}) {
+// --- Standalone mouth demo ------------------------------------------------
+
+function StandaloneMouthDemo() {
+  const mouth = useRef<TalkingMouthHandle>(null)
   return (
-    <section className="mx-auto mt-14 max-w-3xl border-t pt-10">
-      <h2 className="font-mono text-sm font-semibold tracking-tight">
-        The mouth, standalone
-      </h2>
-      <p className="text-muted-foreground mt-1 text-sm">
-        The same lip-sync mouth on a hand-rolled illustration — just{" "}
-        <code className="text-xs">@avatalk/mouth</code>, positioned over your art.
-      </p>
-      <div className="mt-5 flex items-center gap-6">
-        {/* A throwaway "illustration": a peachy face with two dot eyes. */}
+    <div className="flex flex-col items-center gap-5 justify-self-center">
+      <div
+        className="relative size-48 rounded-[42%] shadow-sm ring-1 ring-black/5"
+        style={{ background: "#ffd9b3" }}
+      >
+        <span className="absolute left-[32%] top-[40%] size-3 -translate-x-1/2 rounded-full bg-[#3a2a1a]" />
+        <span className="absolute left-[68%] top-[40%] size-3 -translate-x-1/2 rounded-full bg-[#3a2a1a]" />
         <div
-          className="relative size-40 rounded-[42%] shadow-sm ring-1 ring-black/5"
-          style={{ background: "#ffd9b3" }}
+          className="absolute"
+          style={{ left: "50%", top: "68%", transform: "translate(-50%,-50%)" }}
         >
-          <span className="absolute left-[30%] top-[40%] size-3 -translate-x-1/2 rounded-full bg-[#3a2a1a]" />
-          <span className="absolute left-[70%] top-[40%] size-3 -translate-x-1/2 rounded-full bg-[#3a2a1a]" />
-          <div
-            className="absolute"
-            style={{ left: "50%", top: "68%", transform: "translate(-50%,-50%)" }}
-          >
-            <TalkingMouth
-              ref={mouth}
-              scale={0.9}
-              cavity="#7a1f1f"
-              tongue="#c75c5c"
-            />
-          </div>
-        </div>
-        <div className="flex flex-col gap-2">
-          <Button onClick={() => mouth.current?.play("/sample-tts.mp3")}>
-            <Play className="size-4" /> Play sample
-          </Button>
-          <Button variant="outline" onClick={() => mouth.current?.listen()}>
-            <Mic className="size-4" /> Test mic
-          </Button>
-          <Button variant="ghost" onClick={() => mouth.current?.stop()}>
-            <Square className="size-4" /> Stop
-          </Button>
+          <TalkingMouth ref={mouth} scale={1} cavity="#7a1f1f" tongue="#c75c5c" />
         </div>
       </div>
-    </section>
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => mouth.current?.play("/sample-tts.mp3")}>
+          <Play className="size-4" /> Play
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => mouth.current?.listen()}>
+          <Mic className="size-4" /> Mic
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => mouth.current?.stop()}>
+          <Square className="size-4" /> Stop
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// --- Mona Lisa demo -------------------------------------------------------
+
+function MonaLisaDemo() {
+  const mouth = useRef<TalkingMouthHandle>(null)
+  return (
+    <div className="flex flex-col items-center gap-5 justify-self-center">
+      <MonaLisa
+        mouth={
+          <TalkingMouth ref={mouth} scale={0.62} cavity="#5b3a2e" tongue="#b06a52" />
+        }
+      />
+      <div className="flex gap-2">
+        <Button size="sm" onClick={() => mouth.current?.play("/sample-tts.mp3")}>
+          <Play className="size-4" /> Speak
+        </Button>
+        <Button size="sm" variant="outline" onClick={() => mouth.current?.listen()}>
+          <Mic className="size-4" /> Mic
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => mouth.current?.stop()}>
+          <Square className="size-4" /> Stop
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// --- Features -------------------------------------------------------------
+
+type FeatureItem = { icon: LucideIcon; title: string; body: string }
+
+const FEATURES: FeatureItem[] = [
+  {
+    icon: AudioLines,
+    title: "Voice-agnostic",
+    body: "Bring any audio — ElevenLabs, OpenAI TTS, a recording, or the live microphone. No TTS is baked in.",
+  },
+  {
+    icon: Gauge,
+    title: "On-time lip-sync",
+    body: "ElevenLabs timestamps schedule visemes against the audio clock, so the mouth lands on each phoneme instead of trailing it.",
+  },
+  {
+    icon: Boxes,
+    title: "Three drivers",
+    body: "Scheduled cues, live audio analysis, or swap in your own — one headless useLipsync hook behind them all.",
+  },
+  {
+    icon: MessageSquare,
+    title: "13 visemes",
+    body: "Every phoneme maps to a CSS mouth shape. Mappings ship for ElevenLabs, Azure visemes, plain text, and live audio.",
+  },
+  {
+    icon: Palette,
+    title: "Pure-CSS mouth",
+    body: "No canvas, no WebGL. The mouth is a positioned, tintable CSS element you can drop over any illustration.",
+  },
+  {
+    icon: Wand2,
+    title: "Notion-style avatar",
+    body: "Hundreds of bundled SVG parts, a randomizer, and a copy-paste spec — the whole character travels as JSON.",
+  },
+  {
+    icon: Package,
+    title: "Tiny & typed",
+    body: "React 19, full TypeScript, no heavy dependencies. Two packages you can adopt together or apart.",
+  },
+  {
+    icon: Sparkles,
+    title: "Headless option",
+    body: "useLipsync() hands you { shape, amplitude, status } so you can build entirely custom visuals on top.",
+  },
+]
+
+function Feature({ icon: Icon, title, body }: FeatureItem) {
+  return (
+    <div className="bg-card hover:bg-muted/40 p-6 transition-colors">
+      <Icon className="text-foreground mb-3 size-5" strokeWidth={1.75} />
+      <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
+      <p className="text-muted-foreground mt-1.5 text-[13px] leading-relaxed">
+        {body}
+      </p>
+    </div>
   )
 }

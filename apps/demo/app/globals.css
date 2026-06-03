@@ -130,3 +130,40 @@
 
 /* The eye-blink animation now ships with @avatalk/avatar (avatar.css), pulled
    in automatically when <Avatar> renders. */
+
+@layer components {
+  /* Faint blueprint grid used behind the hero, masked to fade at the edges. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, var(--border) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+  .bg-dots {
+    background-image: radial-gradient(var(--border) 1px, transparent 1px);
+    background-size: 22px 22px;
+  }
+  /* Eyebrow / kicker label above section headings. */
+  .kicker {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+}
+
+/* Soft entrance for sections / the avatar stage. */
+@keyframes avatalk-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-rise {
+  animation: avatalk-rise 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
