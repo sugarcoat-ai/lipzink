@@ -1,6 +1,6 @@
 # lipzink
 
-[lipz.ink](https://lipz.ink)
+[lipz.ink](https://lipz.ink) · [GitHub](https://github.com/sugarcoat-ai/lipzink)
 
 A **voice-agnostic lip-sync mouth** and a notion-style **talking avatar**,
 shipped as independent npm packages. Drop the mouth onto your own illustration,
@@ -14,6 +14,9 @@ packages/
 apps/
   demo/     → the Next.js playground that dogfoods both (and shows how to wire ElevenLabs)
 ```
+
+Published on npm as [@lipzink/mouth](https://www.npmjs.com/package/@lipzink/mouth) and
+[@lipzink/avatar](https://www.npmjs.com/package/@lipzink/avatar).
 
 This is a [bun](https://bun.sh) workspace monorepo.
 

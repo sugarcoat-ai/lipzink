@@ -3,6 +3,12 @@
   "version": "0.1.0",
   "description": "A notion-style avatar with a built-in, voice-agnostic lip-sync mouth. Bundles its own art — works on install with zero asset setup.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sugarcoat-ai/lipzink.git",
+    "directory": "packages/avatar"
+  },
+  "homepage": "https://www.npmjs.com/package/@lipzink/avatar",
   "type": "module",
   "sideEffects": [
     "*.css"

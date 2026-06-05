@@ -17,7 +17,6 @@ import {
   Shuffle,
   Sparkles,
   Square,
-  Volume2,
   Wand2,
 } from "lucide-react"
 
@@ -45,25 +44,47 @@ import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { setAvatarConfig, useAvatarConfig } from "@/lib/use-avatar"
 
-// A phonetic pangram — unlike the letter pangram "the quick brown fox…", this
-// sentence exercises (close to) every English phoneme, so the mouth runs
-// through its whole repertoire of shapes.
-const PANGRAM =
-  "The beige hue on the waters of the loch impressed all, including the French queen, before she heard that symphony again."
+// Demo clips — each maps to a cached file under `data/tts-cache/`.
+const TTS_EXAMPLES = [
+  {
+    id: "pitch",
+    label: "What is lipzink?",
+    emoji: "✨",
+    voiceId: "21m00Tcm4TlvDq8ikWAM",
+    voiceName: "Rachel",
+    text:
+      "What is lipzink? It is a React library that lets you overlay a mouth on an avatar that moves in sync with speech. It works with any audio source, and it is amazing with ElevenLabs timestamps.",
+  },
+  {
+    id: "fox",
+    label: "Quick brown fox",
+    emoji: "🦊",
+    voiceId: "AZnzlk1XvdvUeBnXmlld",
+    voiceName: "Domi",
+    text: "The quick brown fox jumps over the lazy dog.",
+  },
+  {
+    id: "phonemes",
+    label: "Every phoneme",
+    emoji: "🎭",
+    voiceId: "TxGEqnHWrfWFTfGW9XjX",
+    voiceName: "Josh",
+    text:
+      "The beige hue on the waters of the loch impressed all, including the French queen, before she heard that symphony again.",
+  },
+] as const
+
+const PLAYLIST_GRADIENTS = [
+  "from-[oklch(0.78_0.14_15)] to-[oklch(0.62_0.19_15)]",
+  "from-[oklch(0.74_0.12_280)] to-[oklch(0.58_0.16_280)]",
+  "from-[oklch(0.76_0.11_155)] to-[oklch(0.6_0.14_155)]",
+] as const
 
 const LEFT_PARTS: AvatarCategory[] = ["hair", "glasses", "beard", "accessories"]
 const RIGHT_PARTS: AvatarCategory[] = ["face", "eyebrows", "eyes", "nose", "details"]
 
-const VOICES = [
-  { id: "21m00Tcm4TlvDq8ikWAM", name: "Rachel" },
-  { id: "AZnzlk1XvdvUeBnXmlld", name: "Domi" },
-  { id: "EXAVITQu4vr4xnSDxMaL", name: "Bella" },
-  { id: "ErXwobaYiN019PkySvjV", name: "Antoni" },
-  { id: "TxGEqnHWrfWFTfGW9XjX", name: "Josh" },
-]
-
 const INSTALL_CMD = "npm i @lipzink/avatar @lipzink/mouth"
-const REPO_URL = "https://github.com/"
+const REPO_URL = "https://github.com/sugarcoat-ai/lipzink"
 
 function specText(config: AvatarConfig): string {
   return JSON.stringify(config, null, 2)
@@ -78,19 +99,11 @@ async function speak(
   text: string,
   voiceId: string,
 ): Promise<void> {
-  const speech = await fetchElevenLabsSpeech("/api/tts", { text, voiceId })
+  const speech = await fetchElevenLabsSpeech("/api/tts-mock", { text, voiceId })
   await voice.playCues(speech.audio, speech.cues)
 }
 
 // --- Code samples ---------------------------------------------------------
-
-const HERO_CODE = `import { Avatar } from "@lipzink/avatar"
-import "@lipzink/avatar/styles.css"
-
-// "spec" is the JSON you build & copy below
-export function Hi({ spec }) {
-  return <Avatar spec={spec} size={96} />
-}`
 
 const ELEVEN_CODE = `import { useRef } from "react"
 import { Avatar, type AvatarVoiceHandle } from "@lipzink/avatar"
@@ -168,6 +181,17 @@ function Portrait() {
     </div>
   )
 }`
+
+const FEATURE_TINTS = [
+  "bg-[oklch(0.97_0.04_15/0.5)]",
+  "bg-[oklch(0.96_0.05_280/0.45)]",
+  "bg-[oklch(0.96_0.04_145/0.45)]",
+  "bg-[oklch(0.97_0.05_85/0.5)]",
+  "bg-[oklch(0.96_0.05_330/0.4)]",
+  "bg-[oklch(0.97_0.04_15/0.45)]",
+  "bg-[oklch(0.96_0.05_280/0.4)]",
+  "bg-[oklch(0.96_0.04_145/0.4)]",
+] as const
 
 // --- Small building blocks -----------------------------------------------
 
@@ -249,8 +273,7 @@ function Section({
 
 export default function Page() {
   const config = useAvatarConfig()
-  const [text, setText] = useState(PANGRAM)
-  const [voiceId, setVoiceId] = useState(VOICES[0].id)
+  const [activeExample, setActiveExample] = useState<string | null>(null)
   const [status, setStatus] = useState<LipsyncStatus>("idle")
   const [synthesizing, setSynthesizing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -269,14 +292,14 @@ export default function Page() {
 
   const busy = status === "speaking" || status === "listening" || synthesizing
 
-  async function handleTalk() {
+  async function handleExample(example: (typeof TTS_EXAMPLES)[number]) {
     if (!voice.current) return
+    setActiveExample(example.id)
     setError(null)
     setSynthesizing(true)
     try {
-      await speak(voice.current, text, voiceId)
+      await speak(voice.current, example.text, example.voiceId)
     } catch (err) {
-      // No API key / quota? Still show off the mouth with the bundled sample.
       setError(
         err instanceof Error
           ? `${err.message} — playing the sample instead.`
@@ -295,12 +318,12 @@ export default function Page() {
   return (
     <div className="min-h-dvh">
       {/* ---------- Nav ---------- */}
-      <header className="bg-background/80 sticky top-0 z-50 border-b backdrop-blur-md">
+      <header className="border-b border-primary/10 bg-background/75 sticky top-0 z-50 backdrop-blur-md">
         <div className="mx-auto flex max-w-6xl items-center gap-4 px-6 py-3">
-          <span className="font-mono text-sm font-semibold tracking-tight">
+          <span className="text-hero-gradient font-mono text-sm font-semibold tracking-tight">
             lipzink
           </span>
-          <span className="bg-muted text-muted-foreground hidden rounded-full px-2 py-0.5 font-mono text-[10px] sm:inline">
+          <span className="hidden rounded-full bg-primary/10 px-2 py-0.5 font-mono text-[10px] text-primary sm:inline">
             v0.1
           </span>
           <nav className="ml-auto flex items-center gap-1">
@@ -317,18 +340,17 @@ export default function Page() {
       </header>
 
       {/* ---------- Hero ---------- */}
-      <section className="relative overflow-hidden">
-        <div className="bg-grid pointer-events-none absolute inset-0 [mask-image:radial-gradient(ellipse_70%_60%_at_50%_0%,black,transparent)]" />
+      <section className="bg-hero-gradient relative overflow-hidden">
         <div className="relative mx-auto max-w-6xl px-6 pt-16 pb-20 sm:pt-24">
           <div className="mx-auto max-w-2xl text-center">
             <a
-              href="#build"
-              className="text-muted-foreground hover:text-foreground hover:border-foreground/30 mb-6 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 font-mono text-xs transition-colors"
+              href="#voice"
+              className="mb-6 inline-flex items-center gap-1.5 rounded-full border border-primary/25 bg-primary/10 px-3 py-1 font-mono text-xs text-primary transition-colors hover:bg-primary/15"
             >
               <Sparkles className="size-3.5" />
               voice-agnostic lip-sync for React
             </a>
-            <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
+            <h1 className="text-hero-gradient text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
               Make your avatar talk.
             </h1>
             <p className="text-muted-foreground mx-auto mt-5 max-w-xl text-base leading-relaxed text-pretty sm:text-lg">
@@ -339,11 +361,14 @@ export default function Page() {
           </div>
 
           {/* Talking avatar + console */}
-          <div className="mx-auto mt-12 grid max-w-4xl items-center gap-8 md:grid-cols-[auto_minmax(0,1fr)]">
-            <div className="animate-rise flex flex-col items-center gap-3 justify-self-center">
+          <div className="mx-auto mt-12 grid max-w-4xl items-start gap-6 md:grid-cols-[280px_minmax(0,1fr)] md:gap-8">
+            <div className="animate-rise flex w-full flex-col items-center gap-3">
               <div
-                className="rounded-[2rem] p-5 shadow-sm ring-1 ring-black/5"
-                style={{ background: "#f5f1ea" }}
+                className="rounded-[2rem] p-5 shadow-md ring-1 ring-primary/15"
+                style={{
+                  background:
+                    "linear-gradient(145deg, #fff5eb 0%, #f5e8ff 55%, #e8fff5 100%)",
+                }}
               >
                 <Avatar
                   spec={config}
@@ -355,84 +380,160 @@ export default function Page() {
               <StatusPill status={status} synthesizing={synthesizing} />
             </div>
 
-            <div className="bg-card animate-rise w-full rounded-2xl border p-4 shadow-sm sm:p-5">
-              <label className="kicker mb-2 block">say something</label>
-              <textarea
-                value={text}
-                onChange={(e) => setText(e.target.value)}
-                rows={3}
-                className="focus-visible:ring-ring/40 w-full resize-none rounded-lg border bg-transparent px-3 py-2.5 text-sm leading-relaxed outline-none focus-visible:ring-2"
-                placeholder="Type something for the avatar to say…"
-              />
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <select
-                  value={voiceId}
-                  onChange={(e) => setVoiceId(e.target.value)}
-                  className="bg-background h-8 rounded-lg border px-2 text-sm outline-none"
-                  aria-label="Voice"
+            <div className="bg-card/90 animate-rise flex w-full min-w-0 flex-col rounded-2xl border border-primary/10 p-4 shadow-md shadow-primary/5 backdrop-blur-sm sm:p-5">
+              <label className="kicker mb-3 block">try an example</label>
+              <ul className="flex flex-1 flex-col gap-1.5">
+                {TTS_EXAMPLES.map((example, index) => {
+                  const playing = activeExample === example.id && busy
+                  return (
+                    <li key={example.id}>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          playing
+                            ? voice.current?.stop()
+                            : handleExample(example)
+                        }
+                        disabled={busy && !playing}
+                        aria-label={
+                          playing ? `Stop ${example.label}` : `Play ${example.label}`
+                        }
+                        className={cn(
+                          "group grid w-full grid-cols-[2.5rem_minmax(0,1fr)_1.75rem] items-center gap-3 rounded-full px-2 py-2 text-left transition-all outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                          playing
+                            ? "bg-primary/10 ring-1 ring-primary/25"
+                            : "hover:bg-accent/60",
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "flex size-10 items-center justify-center rounded-full bg-gradient-to-br text-white shadow-sm transition-transform group-hover:scale-105 group-disabled:scale-100",
+                            PLAYLIST_GRADIENTS[index % PLAYLIST_GRADIENTS.length],
+                          )}
+                        >
+                          {playing ? (
+                            <Square className="size-3.5 fill-current" />
+                          ) : (
+                            <Play className="size-4 fill-current translate-x-px" />
+                          )}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium leading-tight">
+                            {example.label}
+                          </span>
+                          <span className="text-muted-foreground block truncate text-[11px] leading-tight">
+                            {example.voiceName}
+                          </span>
+                        </span>
+                        <span className="text-center text-base leading-none opacity-80" aria-hidden>
+                          {example.emoji}
+                        </span>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-border/60 pt-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => setAvatarConfig(randomAvatar())}
                 >
-                  {VOICES.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.name}
-                    </option>
-                  ))}
-                </select>
-
-                <div className="ml-auto flex flex-wrap gap-2">
+                  <Shuffle className="size-4" /> Randomize
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => voice.current?.playAudio("/sample-tts.mp3")}
+                  disabled={busy}
+                >
+                  <Play className="size-4" /> Sample
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="rounded-full"
+                  onClick={() => voice.current?.startMic()}
+                  disabled={busy}
+                >
+                  <Mic className="size-4" /> Mic
+                </Button>
+                {busy ? (
                   <Button
-                    variant="ghost"
                     size="sm"
-                    onClick={() => voice.current?.playAudio("/sample-tts.mp3")}
-                    disabled={busy}
+                    variant="default"
+                    className="rounded-full"
+                    onClick={() => voice.current?.stop()}
                   >
-                    <Play className="size-4" /> Sample
+                    <Square className="size-4" /> Stop
                   </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => voice.current?.startMic()}
-                    disabled={busy}
-                  >
-                    <Mic className="size-4" /> Mic
-                  </Button>
-                  {busy ? (
-                    <Button size="sm" variant="secondary" onClick={() => voice.current?.stop()}>
-                      <Square className="size-4" /> Stop
-                    </Button>
-                  ) : (
-                    <Button size="sm" onClick={handleTalk} disabled={!text.trim()}>
-                      <Volume2 className="size-4" /> Make it talk
-                    </Button>
-                  )}
-                </div>
+                ) : null}
               </div>
               {error ? (
-                <p className="text-muted-foreground mt-2.5 text-xs">{error}</p>
-              ) : (
-                <p className="text-muted-foreground mt-2.5 text-xs">
-                  That’s a phonetic pangram — every English sound.{" "}
-                  <span className="opacity-70">
-                    “Sample” needs no key; “Make it talk” uses ElevenLabs via{" "}
-                    <code>/api/tts</code>.
-                  </span>
-                </p>
-              )}
+                <p className="text-muted-foreground mt-3 text-center text-xs">{error}</p>
+              ) : null}
             </div>
-          </div>
-
-          {/* Simple example of the Avatar code */}
-          <div className="mx-auto mt-10 max-w-xl">
-            <CodeWindow
-              tabs={[{ label: "Avatar", file: "hi.tsx", code: HERO_CODE }]}
-            />
           </div>
         </div>
       </section>
 
-      {/* ---------- Step 01 · Build ---------- */}
+      {/* ---------- Use case 01 · Voice / code ---------- */}
+      <Section id="voice" className="bg-section-warm border-t-0">
+        <SectionHeader kicker="Use case 01 · Give it a voice" title="Two lines to talking">
+          The avatar is voice-agnostic — you bring the sound. With ElevenLabs
+          timestamps the mouth lands on every phoneme on time; with any other
+          audio it follows along live. Pick your lane:
+        </SectionHeader>
+
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+          <CodeWindow
+            tabs={[
+              { label: "With ElevenLabs", file: "talking.tsx", code: ELEVEN_CODE },
+              { label: "Any audio / mic", file: "talking.tsx", code: ANY_AUDIO_CODE },
+            ]}
+          />
+          <VisemeExplorer />
+        </div>
+      </Section>
+
+      {/* ---------- Use case 02 · Mouth only ---------- */}
+      <Section id="mouth" className="bg-section-cool">
+        <SectionHeader kicker="Use case 02 · Mouth only" title="Just the mouth">
+          Don’t need the whole character? <code className="text-xs">@lipzink/mouth</code>{" "}
+          is a standalone, pure-CSS mouth — no avatar, no assets. Position it over
+          any illustration and tint it to match.
+        </SectionHeader>
+
+        <div className="grid items-center gap-8 lg:grid-cols-[auto_minmax(0,1fr)]">
+          <StandaloneMouthDemo />
+          <CodeWindow
+            tabs={[{ label: "Mouth", file: "character.tsx", code: MOUTH_CODE }]}
+          />
+        </div>
+      </Section>
+
+      {/* ---------- Use case 03 · Your own face ---------- */}
+      <Section id="own" className="bg-section-warm">
+        <SectionHeader kicker="Use case 03 · Bring your own face" title="Put a mouth on anything">
+          The mouth is just a positioned CSS element — so it works on a photo, an
+          illustration, even a Renaissance masterpiece. Here she is, finally able
+          to answer the question everyone asks.
+        </SectionHeader>
+
+        <div className="grid items-center gap-10 lg:grid-cols-[auto_minmax(0,1fr)]">
+          <MonaLisaDemo />
+          <CodeWindow
+            tabs={[{ label: "Your art", file: "portrait.tsx", code: OWN_FACE_CODE }]}
+          />
+        </div>
+      </Section>
+
+      {/* ---------- Build your avatar ---------- */}
       <Section id="build">
         <div className="flex flex-wrap items-end justify-between gap-4">
-          <SectionHeader kicker="Step 01 · Create" title="Build your avatar">
+          <SectionHeader kicker="Bonus · Create" title="Build your avatar">
             Click through the parts — or roll the dice. The avatar above updates
             live. When you like it, copy the spec: a tiny JSON blob you pass to{" "}
             <code className="text-xs">&lt;Avatar spec /&gt;</code>.
@@ -453,8 +554,11 @@ export default function Page() {
           </div>
           <div className="order-1 flex justify-center lg:order-2">
             <div
-              className="rounded-[2rem] p-5 ring-1 ring-black/5"
-              style={{ background: "#f5f1ea" }}
+              className="rounded-[2rem] p-5 shadow-md ring-1 ring-primary/15"
+              style={{
+                background:
+                  "linear-gradient(145deg, #fff5eb 0%, #f5e8ff 55%, #e8fff5 100%)",
+              }}
             >
               <Avatar spec={config} size={260} />
             </div>
@@ -467,71 +571,20 @@ export default function Page() {
         </div>
       </Section>
 
-      {/* ---------- Step 02 · Voice / code ---------- */}
-      <Section id="voice">
-        <SectionHeader kicker="Step 02 · Give it a voice" title="Two lines to talking">
-          The avatar is voice-agnostic — you bring the sound. With ElevenLabs
-          timestamps the mouth lands on every phoneme on time; with any other
-          audio it follows along live. Pick your lane:
-        </SectionHeader>
-
-        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          <CodeWindow
-            tabs={[
-              { label: "With ElevenLabs", file: "talking.tsx", code: ELEVEN_CODE },
-              { label: "Any audio / mic", file: "talking.tsx", code: ANY_AUDIO_CODE },
-            ]}
-          />
-          <VisemeExplorer />
-        </div>
-      </Section>
-
-      {/* ---------- Case 02 · Mouth only ---------- */}
-      <Section id="mouth">
-        <SectionHeader kicker="Use case 02 · Mouth only" title="Just the mouth">
-          Don’t need the whole character? <code className="text-xs">@lipzink/mouth</code>{" "}
-          is a standalone, pure-CSS mouth — no avatar, no assets. Position it over
-          any illustration and tint it to match.
-        </SectionHeader>
-
-        <div className="grid items-center gap-8 lg:grid-cols-[auto_minmax(0,1fr)]">
-          <StandaloneMouthDemo />
-          <CodeWindow
-            tabs={[{ label: "Mouth", file: "character.tsx", code: MOUTH_CODE }]}
-          />
-        </div>
-      </Section>
-
-      {/* ---------- Case 03 · Your own face ---------- */}
-      <Section id="own">
-        <SectionHeader kicker="Use case 03 · Bring your own face" title="Put a mouth on anything">
-          The mouth is just a positioned CSS element — so it works on a photo, an
-          illustration, even a Renaissance masterpiece. Here she is, finally able
-          to answer the question everyone asks.
-        </SectionHeader>
-
-        <div className="grid items-center gap-10 lg:grid-cols-[auto_minmax(0,1fr)]">
-          <MonaLisaDemo />
-          <CodeWindow
-            tabs={[{ label: "Your art", file: "portrait.tsx", code: OWN_FACE_CODE }]}
-          />
-        </div>
-      </Section>
-
       {/* ---------- Features ---------- */}
       <Section id="features">
         <SectionHeader kicker="Everything else" title="Built to drop in">
           Small, typed, and unopinionated about your stack.
         </SectionHeader>
-        <div className="grid gap-px overflow-hidden rounded-2xl border bg-border/70 sm:grid-cols-2 lg:grid-cols-4">
-          {FEATURES.map((f) => (
-            <Feature key={f.title} {...f} />
+        <div className="grid gap-px overflow-hidden rounded-2xl border border-primary/10 bg-border/70 sm:grid-cols-2 lg:grid-cols-4">
+          {FEATURES.map((f, i) => (
+            <Feature key={f.title} {...f} tint={FEATURE_TINTS[i % FEATURE_TINTS.length]} />
           ))}
         </div>
       </Section>
 
       {/* ---------- Footer ---------- */}
-      <footer className="border-t">
+      <footer className="border-t border-primary/10 bg-gradient-to-b from-transparent to-primary/5">
         <div className="text-muted-foreground mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 py-10 text-sm sm:flex-row">
           <div className="flex items-center gap-2">
             <a
@@ -543,6 +596,19 @@ export default function Page() {
             <span className="text-muted-foreground/70">·</span>
             <span>MIT licensed</span>
           </div>
+          <a
+            href="https://sugarcoat.ai"
+            target="_blank"
+            rel="noreferrer"
+            className="text-muted-foreground hover:text-foreground inline-flex items-center gap-2 transition-colors"
+          >
+            <span className="text-xs">designed by</span>
+            <img
+              src="/sugarcoat_logo.png"
+              alt="Sugarcoat"
+              className="h-13 w-auto"
+            />
+          </a>
           <CopyButton value={INSTALL_CMD} variant="ghost" size="sm">
             <span className="font-mono text-xs">{INSTALL_CMD}</span>
           </CopyButton>
@@ -589,7 +655,7 @@ function StatusPill({
 function VisemeExplorer() {
   const [shape, setShape] = useState<LipShape>("aei")
   return (
-    <div className="bg-card flex flex-col rounded-2xl border p-5">
+    <div className="bg-card flex flex-col rounded-2xl border border-primary/10 p-5 shadow-sm">
       <div className="kicker mb-1">13 shapes · every phoneme</div>
       <p className="text-muted-foreground mb-4 text-sm">
         Whatever drives the mouth — timestamps, live audio, the mic — resolves to
@@ -597,7 +663,10 @@ function VisemeExplorer() {
       </p>
       <div
         className="mb-4 flex items-center justify-center rounded-xl py-8"
-        style={{ background: "#f5f1ea" }}
+        style={{
+          background:
+            "linear-gradient(145deg, #fff0e8 0%, #f3e8ff 50%, #e5fff3 100%)",
+        }}
       >
         <Mouth shape={shape} scale={1.6} cavity="#7a1f1f" tongue="#c75c5c" />
       </div>
@@ -611,8 +680,8 @@ function VisemeExplorer() {
             className={cn(
               "rounded-full border px-2.5 py-1 font-mono text-[11px] transition-colors",
               shape === s
-                ? "border-foreground bg-foreground text-background"
-                : "border-border text-muted-foreground hover:bg-muted hover:text-foreground",
+                ? "border-primary bg-primary text-primary-foreground"
+                : "border-border text-muted-foreground hover:border-primary/30 hover:bg-primary/5 hover:text-foreground",
             )}
           >
             {LIP_SHAPE_LABELS[s]}
@@ -730,10 +799,15 @@ const FEATURES: FeatureItem[] = [
   },
 ]
 
-function Feature({ icon: Icon, title, body }: FeatureItem) {
+function Feature({
+  icon: Icon,
+  title,
+  body,
+  tint,
+}: FeatureItem & { tint: string }) {
   return (
-    <div className="bg-card hover:bg-muted/40 p-6 transition-colors">
-      <Icon className="text-foreground mb-3 size-5" strokeWidth={1.75} />
+    <div className={cn("p-6 transition-colors hover:brightness-[0.98]", tint)}>
+      <Icon className="mb-3 size-5 text-primary" strokeWidth={1.75} />
       <h3 className="text-sm font-semibold tracking-tight">{title}</h3>
       <p className="text-muted-foreground mt-1.5 text-[13px] leading-relaxed">
         {body}

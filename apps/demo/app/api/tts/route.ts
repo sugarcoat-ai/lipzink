@@ -7,6 +7,8 @@
 // in @lipzink/mouth, which consumes exactly this response.
 //
 // Requires ELEVENLABS_API_KEY in the environment (see .env.example).
+// Disabled by default on the public demo — set TTS_ENABLED=true to turn it back on.
+// The site uses `/api/tts-mock` (cached clips) instead.
 
 const ELEVENLABS_URL = "https://api.elevenlabs.io/v1/text-to-speech";
 
@@ -17,6 +19,16 @@ type TtsBody = {
 };
 
 export async function POST(request: Request) {
+  if (process.env.TTS_ENABLED !== "true") {
+    return Response.json(
+      {
+        error:
+          "Live TTS is disabled. Use /api/tts-mock for the demo, or set TTS_ENABLED=true.",
+      },
+      { status: 503 },
+    );
+  }
+
   const apiKey = process.env.ELEVENLABS_API_KEY;
   if (!apiKey) {
     return Response.json(
